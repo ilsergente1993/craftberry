@@ -15,33 +15,52 @@ using namespace pcpp;
 
 int main(/*int argc, char *argv[]*/) {
     //apertura del file
-    IFileReaderDevice *reader = IFileReaderDevice::getReader("captures/big.pcapng");
-    if (reader == NULL) {
-        printf("Cannot determine reader for file type\n");
+    string filename = "2_mix";
+    IFileReaderDevice *input = IFileReaderDevice::getReader(("captures/" + filename + ".pcap").c_str());
+    if (input == NULL) {
+        printf("Cannot determine input for file type\n");
         exit(1);
     }
-    if (!reader->open()) {
-        printf("Cannot open input.pcap for reading\n");
+    if (!input->open()) {
+        printf("Cannot open the input file for reading\n");
         exit(1);
     }
 
     //lettura del pacchetto
     RawPacket rawPacket;
     packetsContainer pakStat;
-    //scorro tutti i pacchetti
-    while (reader->getNextPacket(rawPacket)) {
-        Packet parsedPacket(&rawPacket);
+    PcapNgFileWriterDevice output(("captures/" + filename + "_out.pcapng").c_str());
+    output.open();
 
-        Crafter::HTTPImageSubstitution(&parsedPacket);
+    //scorro tutti i pacchetti
+    while (input->getNextPacket(rawPacket)) {
+        // output.writePacket(rawPacket);
+        // continue;
+
+        Packet parsedPacket(&rawPacket);
+        //cout << parsedPacket.toString() << endl;
+
+        if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
+            output.writePacket(rawPacket);
+            output.writePacket(rawPacket);
+        }
+
+        //Crafter::HTTPImageSubstitution(&parsedPacket);
+        /*
+        Packet p = Crafter::multiplyTCP(parsedPacket);
+        cout << "len 1" << parsedPacket.getFirstLayer()->getDataLen() << " bytes" << endl;
+        cout << "len 2" << p.getFirstLayer()->getDataLen() << " bytes" << endl;
+        */
 
         //scorro tutti i layer
-        /*int i = 0;
+        int i = 0;
         for (Layer *curLayer = parsedPacket.getFirstLayer(); curLayer != NULL && i < 8; curLayer = curLayer->getNextLayer(), i++) {
             pakStat.add(curLayer);
-        }*/
+        }
     }
 
-    pakStat.printStats();
+    //pakStat.printStats();
     //chiusura del file
-    reader->close();
+    output.close();
+    input->close();
 }
