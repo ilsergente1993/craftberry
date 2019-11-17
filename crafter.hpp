@@ -6,6 +6,7 @@
 #include "pcapplusplus/IPv4Layer.h"
 #include "pcapplusplus/Packet.h"
 #include "pcapplusplus/PcapFileDevice.h"
+#include "pcapplusplus/PcapLiveDeviceList.h"
 #include "pcapplusplus/TcpLayer.h"
 #include "pcapplusplus/UdpLayer.h"
 #include "pcapplusplus/VlanLayer.h"
@@ -16,14 +17,10 @@ using namespace std;
 using namespace pcpp;
 
 class Crafter {
-  public:
+public:
     Crafter(){};
-    void help() {
-        cout << "";
-    };
-
     //LEV 2
-    void VLANDoubleTagging(){};
+    void VLANDoubleTagging();
     //LEV 4
     static Packet multiplyTCP(Packet packet) {
         Packet p(packet);
@@ -57,10 +54,10 @@ class Crafter {
     };
     void multiplyUDP(int n){};
     //LEV 5
-    static void HTTPImageSubstitution(Packet *packet) {
+    static void HTTPImageSubstitution(Packet packet) {
         //NOTE: non riesco a prendere l'immagine perchè è suddivisa su più frame e devo prima ricostruire i pacchetti tcp
         //vedi: https://github.com/seladb/PcapPlusPlus/blob/master/Examples/TcpReassembly/main.cpp
-        HttpResponseLayer *response = packet->getLayerOfType<HttpResponseLayer>();
+        HttpResponseLayer *response = packet.getLayerOfType<HttpResponseLayer>();
         if (response == NULL)
             return;
 
@@ -82,5 +79,18 @@ class Crafter {
     };
 
     void HTTPContentCatcher(){};
-    void DNSRobber(){};
+
+    static void DNSRobber(Packet packet) {
+        DnsLayer *response = packet.getLayerOfType<DnsLayer>();
+        if (response == NULL)
+            return;
+
+        DnsQuery *q;
+        if ((q = response->getFirstQuery()) == NULL)
+            return;
+        do {
+            cout << q->getName() << ", ";
+        } while ((q = response->getNextQuery(q)) != NULL);
+        cout << endl;
+    };
 };
