@@ -62,88 +62,73 @@ int main(int argc, char *argv[]) {
     }
 
     //DOC: apertura del file
-    string filename = "2_mix";
-
+    string filename = "tcpmult_01"; //"dns_01";
     IFileReaderDevice *input = IFileReaderDevice::getReader(("captures/" + filename + ".pcap").c_str());
-    PcapNgFileWriterDevice output(("captures/" + filename + "_out.pcapng").c_str());
+    PcapNgFileWriterDevice *output = new PcapNgFileWriterDevice(("captures/" + filename + "_out.pcapng").c_str());
 
     if (input == NULL || !input->open()) {
-        printf("Cannot open the input file for reading or cannot determine input for file type\n");
+        cout << "Cannot open the input file for reading or cannot determine input for file type\n";
         exit(1);
     }
-    if (!output.open()) {
-        printf("Cannot open the output file\n");
+    if (!output->open()) {
+        cout << "Cannot open the output file\n";
+        exit(1);
+    }
+    Crafter C(input, output);
+
+    if (attackName.compare("DNS") == 0) {
+        C.DNSRobber({{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}});
+    } else if (attackName.compare("TCPMULTIPLY") == 0) {
+        C.multiplyTCP(3);
+    } else {
+        help();
         exit(1);
     }
 
-    if (attackName != "") {
-        //lettura del pacchetto
-        RawPacket inPacket;
-        //packetsContainer pakStat;
+    C.getOutputStats();
+    //chiusura dei file
+    output->close();
+    input->close();
+}
 
-        //scorro tutti i pacchetti
-        while (input->getNextPacket(inPacket)) {
-            Packet parsedPacket(&inPacket);
-            //cout << parsedPacket.toString() << endl;
+//packetsContainer pakStat;
 
-            //DOC: doppia i pacchetti
-            // if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
-            //     output.writePacket(inPacket);
-            //     output.writePacket(inPacket);
-            // }
-
-            Packet outPacket;
-
-            //outPacket = Crafter::DNSRobber(parsedPacket);
-
-            //Crafter::HTTPImageSubstitution(&parsedPacket);
-            /*
+//Crafter::HTTPImageSubstitution(&parsedPacket);
+/*
             Packet p = Crafter::multiplyTCP(parsedPacket);
             cout << "len 1" << parsedPacket.getFirstLayer()->getDataLen() << " bytes" << endl;
             cout << "len 2" << p.getFirstLayer()->getDataLen() << " bytes" << endl;
             */
 
-            //scorro tutti i layer
-            int i = 0;
-            for (Layer *curLayer = parsedPacket.getFirstLayer(); curLayer != NULL && i < 8; curLayer = curLayer->getNextLayer(), i++) {
-                //pakStat.add(curLayer);
-            }
-            cout << inPacket.getFrameLength() << endl;
-            output.writePacket(inPacket);
-        }
+//scorro tutti i layer
+//int i = 0;
+//for (Layer *curLayer = parsedPacket.getFirstLayer(); curLayer != NULL && i < 8; curLayer = curLayer->getNextLayer(), i++) {
+//pakStat.add(curLayer);
+// }
+//cout << inPacket.getFrameLength() << endl;
 
-        // create the stats object
-        pcap_stat stats;
-        output.getStatistics(stats);
-        printf("Written %d packets successfully to pcap-ng writer and %d packets could not be written\n", stats.ps_recv, stats.ps_drop);
-
-        //pakStat.printStats();
-        //chiusura dei file
-        output.close();
-        input->close();
-    }
-}
+//pakStat.printStats();
 
 void help() {
-    printf("\nUsage: Craftberry options:\n"
-           "-------------------------\n"
-           " -A interface src -B interface dst { -a ATTACKNAME | -d DEFENSENAME }\n"
-           "\nOptions:\n"
-           "    -A interface src  : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
-           "    -B interface dst  : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
-           "    -a                : Use the specified attack\n"
-           "    -d                : Use the specified defence\n"
-           "    -l                : Print the list of interfaces and exists\n"
-           "    -h                : Displays this help message and exits\n"
-           "\nATTACKNAME:\n"
-           /*"    DNS            : description\n"
-           "    HTTP           : description\n"
-           "    HTTPIMAGE      : description\n"
-           "    TCPMULTIPY     : description\n"
-           "    UDPMULTIPY     : description\n"*/
-           "\nDEFENSENAME:\n"
-           //"    CHACHA20       : description\n"
-    );
+    cout << "\nUsage: Craftberry options:\n"
+            "-------------------------\n"
+            " -A interface src -B interface dst { -a ATTACKNAME | -d DEFENSENAME }\n"
+            "\nOptions:\n"
+            "    -A interface src  : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
+            "    -B interface dst  : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
+            "    -a                : Use the specified attack\n"
+            "    -d                : Use the specified defence\n"
+            "    -l                : Print the list of interfaces and exists\n"
+            "    -h                : Displays this help message and exits\n"
+            "\nATTACKNAME:\n"
+            "    DNS            : description\n"
+            "    HTTP           : description\n"
+            "    HTTPIMAGE      : description\n"
+            "    TCPMULTIPY     : description\n"
+            "    UDPMULTIPY     : description\n"
+            "\nDEFENSENAME:\n"
+        //"    CHACHA20       : description\n"
+        ;
     exit(0);
 }
 

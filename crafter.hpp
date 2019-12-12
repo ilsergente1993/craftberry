@@ -17,40 +17,29 @@ using namespace std;
 using namespace pcpp;
 
 class Crafter {
+private:
+    IFileReaderDevice *input;
+    PcapNgFileWriterDevice *output;
+
 public:
-    Crafter(){};
+    Crafter(IFileReaderDevice *input, PcapNgFileWriterDevice *output) {
+        this->input = input;
+        this->output = output;
+    };
     //LEV 2
     void VLANDoubleTagging();
     //LEV 4
-    static Packet multiplyTCP(Packet packet) {
-        Packet p(packet);
-        return p;
-        // Packet p(100);
-        // p.setRawPacket(packet->getRawPacket(), false);
-        // return p;
-        /*// Packet Creation
-        // create a new Ethernet layer
-        EthLayer newEthernetLayer(MacAddress("00:50:43:11:22:33"), MacAddress("aa:bb:cc:dd:ee"));
-        // create a new IPv4 layer
-        IPv4Layer newIPLayer(IPv4Address(std::string("192.168.1.1")), IPv4Address(std::string("10.0.0.1")));
-        newIPLayer.getIPv4Header()->ipId = htons(2000);
-        newIPLayer.getIPv4Header()->timeToLive = 64;
-        // create a new UDP layer
-        UdpLayer newUdpLayer(12345, 53);
-        // create a new DNS layer
-        DnsLayer newDnsLayer;
-        newDnsLayer.addQuery("www.ebay.com", DNS_TYPE_A, DNS_CLASS_IN);
-        // create a packet with initial capacity of 100 bytes (will grow automatically if needed)
-        Packet newPacket(100);
-        // add all the layers we created
-        newPacket.addLayer(&newEthernetLayer);
-        newPacket.addLayer(&newIPLayer);
-        newPacket.addLayer(&newUdpLayer);
-        newPacket.addLayer(&newDnsLayer);
-        // compute all calculated fields
-        newPacket.computeCalculateFields();
-        // write the new packet to a pcap file
-        return newPacket;*/
+    void multiplyTCP(int n) {
+        if (n < 0)
+            return;
+        RawPacket inPacket;
+        while (this->input->getNextPacket(inPacket)) {
+            Packet parsedPacket(&inPacket);
+            if (!parsedPacket.isPacketOfType(ProtocolType::TCP))
+                continue;
+            for (int i = 0; i < n; i++)
+                this->output->writePacket(inPacket);
+        }
     };
     void multiplyUDP(int n){};
     //LEV 5
@@ -80,18 +69,41 @@ public:
 
     void HTTPContentCatcher(){};
 
-    static Packet DNSRobber(Packet packet) {
-        DnsLayer *response = packet.getLayerOfType<DnsLayer>();
-        if (response == NULL)
-            return packet;
+    //map di sostituzioni <from,to>
+    void DNSRobber(map<string, string> substitutions) {
+        RawPacket inPacket;
+        while (this->input->getNextPacket(inPacket)) {
+            Packet parsedPacket(&inPacket);
+            DnsLayer *response = parsedPacket.getLayerOfType<DnsLayer>();
+            if (response == NULL)
+                continue;
+            DnsQuery *q;
+            if ((q = response->getFirstQuery()) == NULL)
+                continue;
+            do {
+                cout << q->getName();
 
-        DnsQuery *q;
-        if ((q = response->getFirstQuery()) == NULL)
-            return packet;
-        do {
-            cout << q->getName() << ", ";
-        } while ((q = response->getNextQuery(q)) != NULL);
-        cout << endl;
-        return packet;
+                for (auto &x : substitutions) {
+                    //cout << x.first << ", " << x.second << endl;
+                    if (q->getName().compare(x.first) == 0 && q->setName(x.second))
+                        cout << " --> " << x.second;
+                }
+
+                //if (q->getName().compare(from) == 0 && q->setName(to)) {
+                //    cout << " --> " << to;
+                //}
+            } while ((q = response->getNextQuery(q)) != NULL);
+            cout << endl;
+
+            parsedPacket.computeCalculateFields();
+            this->output->writePacket(*parsedPacket.getRawPacket());
+        }
     };
+
+    void getOutputStats() {
+        // create the stats object
+        pcap_stat stats;
+        this->output->getStatistics(stats);
+        cout << "Written " << stats.ps_recv << " packets successfully to pcap-ng writer and " << stats.ps_drop << " packets could not be written\n";
+    }
 };

@@ -1,0 +1,1 @@
+ make;  ./craftberry -a 1
