@@ -80,17 +80,18 @@ public:
 
     void HTTPContentCatcher(){};
 
-    static void DNSRobber(Packet packet) {
+    static Packet DNSRobber(Packet packet) {
         DnsLayer *response = packet.getLayerOfType<DnsLayer>();
         if (response == NULL)
-            return;
+            return packet;
 
         DnsQuery *q;
         if ((q = response->getFirstQuery()) == NULL)
-            return;
+            return packet;
         do {
             cout << q->getName() << ", ";
         } while ((q = response->getNextQuery(q)) != NULL);
         cout << endl;
+        return packet;
     };
 };

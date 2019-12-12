@@ -63,55 +63,62 @@ int main(int argc, char *argv[]) {
 
     //DOC: apertura del file
     string filename = "2_mix";
+
     IFileReaderDevice *input = IFileReaderDevice::getReader(("captures/" + filename + ".pcap").c_str());
-    if (input == NULL) {
-        printf("Cannot determine input for file type\n");
+    PcapNgFileWriterDevice output(("captures/" + filename + "_out.pcapng").c_str());
+
+    if (input == NULL || !input->open()) {
+        printf("Cannot open the input file for reading or cannot determine input for file type\n");
         exit(1);
     }
-    if (!input->open()) {
-        printf("Cannot open the input file for reading\n");
+    if (!output.open()) {
+        printf("Cannot open the output file\n");
         exit(1);
     }
 
     if (attackName != "") {
         //lettura del pacchetto
-        RawPacket rawPacket;
-        packetsContainer pakStat;
-        PcapNgFileWriterDevice output(("captures/" + filename + "_out.pcapng").c_str());
-        output.open();
+        RawPacket inPacket;
+        //packetsContainer pakStat;
 
         //scorro tutti i pacchetti
-        while (input->getNextPacket(rawPacket)) {
-            // output.writePacket(rawPacket);
-            // continue;
-
-            Packet parsedPacket(&rawPacket);
+        while (input->getNextPacket(inPacket)) {
+            Packet parsedPacket(&inPacket);
             //cout << parsedPacket.toString() << endl;
 
             //DOC: doppia i pacchetti
             // if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
-            //     output.writePacket(rawPacket);
-            //     output.writePacket(rawPacket);
+            //     output.writePacket(inPacket);
+            //     output.writePacket(inPacket);
             // }
 
-            Crafter::DNSRobber(parsedPacket);
+            Packet outPacket;
+
+            //outPacket = Crafter::DNSRobber(parsedPacket);
 
             //Crafter::HTTPImageSubstitution(&parsedPacket);
             /*
-        Packet p = Crafter::multiplyTCP(parsedPacket);
-        cout << "len 1" << parsedPacket.getFirstLayer()->getDataLen() << " bytes" << endl;
-        cout << "len 2" << p.getFirstLayer()->getDataLen() << " bytes" << endl;
-        */
+            Packet p = Crafter::multiplyTCP(parsedPacket);
+            cout << "len 1" << parsedPacket.getFirstLayer()->getDataLen() << " bytes" << endl;
+            cout << "len 2" << p.getFirstLayer()->getDataLen() << " bytes" << endl;
+            */
 
             //scorro tutti i layer
             int i = 0;
             for (Layer *curLayer = parsedPacket.getFirstLayer(); curLayer != NULL && i < 8; curLayer = curLayer->getNextLayer(), i++) {
-                pakStat.add(curLayer);
+                //pakStat.add(curLayer);
             }
+            cout << inPacket.getFrameLength() << endl;
+            output.writePacket(inPacket);
         }
 
+        // create the stats object
+        pcap_stat stats;
+        output.getStatistics(stats);
+        printf("Written %d packets successfully to pcap-ng writer and %d packets could not be written\n", stats.ps_recv, stats.ps_drop);
+
         //pakStat.printStats();
-        //chiusura del file
+        //chiusura dei file
         output.close();
         input->close();
     }
