@@ -35,7 +35,7 @@ public:
     //LEV 2
     void VLANDoubleTagging();
     //LEV 4
-    void multiplyTCP(int n) {
+    void TCPmultiply(int n) {
         if (n < 0) {
             cout << "Cool, but I cannot do that dude!" << endl;
             return;
@@ -49,7 +49,7 @@ public:
                 this->output->writePacket(inPacket);
         }
     };
-    void multiplyUDP(int n) {
+    void UDPmultiply(int n) {
         if (n < 0) {
             cout << "Cool, but I cannot do that dude!" << endl;
             return;

@@ -79,9 +79,9 @@ int main(int argc, char *argv[]) {
     if (attackName.compare("DNS") == 0) {
         C.DNSRobber({{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}});
     } else if (attackName.compare("TCPMULTIPLY") == 0) {
-        C.multiplyTCP(3);
+        C.TCPmultiply(3);
     } else if (attackName.compare("UDPMULTIPLY") == 0) {
-        C.multiplyUDP(3);
+        C.UDPmultiply(3);
     } else {
         help();
         exit(1);
