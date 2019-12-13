@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     }
 
     //DOC: apertura del file
-    string filename = "tcpmult_01"; //"dns_01";
+    string filename = "udpmult_01"; //"tcpmult_01"; //"dns_01";
     IFileReaderDevice *input = IFileReaderDevice::getReader(("captures/" + filename + ".pcap").c_str());
     PcapNgFileWriterDevice *output = new PcapNgFileWriterDevice(("captures/" + filename + "_out.pcapng").c_str());
 
@@ -80,6 +80,8 @@ int main(int argc, char *argv[]) {
         C.DNSRobber({{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}});
     } else if (attackName.compare("TCPMULTIPLY") == 0) {
         C.multiplyTCP(3);
+    } else if (attackName.compare("UDPMULTIPLY") == 0) {
+        C.multiplyUDP(3);
     } else {
         help();
         exit(1);
