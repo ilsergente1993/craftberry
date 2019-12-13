@@ -77,6 +77,7 @@ public:
 
     //map di sostituzioni <from,to>
     void DNSRobber(map<string, string> substitutions) {
+        //TODO: adesso la sostituzione è in query ed in answer e ritorna malformed packet. Separare??
         RawPacket inPacket;
         while (this->input->getNextPacket(inPacket)) {
             Packet parsedPacket(&inPacket);
@@ -90,10 +91,9 @@ public:
                 DEBUG(q->getName());
                 for (auto &dnsname : substitutions) {
                     if (q->getName().compare(dnsname.first) == 0 && q->setName(dnsname.second))
-                        DEBUG(" --> " << dnsname.second);
+                        DEBUG(" --> " << dnsname.second << endl);
                 }
             } while ((q = response->getNextQuery(q)) != NULL);
-            cout << endl;
 
             parsedPacket.computeCalculateFields();
             this->output->writePacket(*parsedPacket.getRawPacket());
