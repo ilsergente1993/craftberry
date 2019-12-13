@@ -13,6 +13,11 @@
 #include "stdlib.h"
 #include "string.h"
 
+#define DEBUG(x)        \
+    do {                \
+        std::cerr << x; \
+    } while (0)
+
 using namespace std;
 using namespace pcpp;
 
@@ -20,6 +25,7 @@ class Crafter {
 private:
     IFileReaderDevice *input;
     PcapNgFileWriterDevice *output;
+    static const bool debug = true;
 
 public:
     Crafter(IFileReaderDevice *input, PcapNgFileWriterDevice *output) {
@@ -81,17 +87,11 @@ public:
             if ((q = response->getFirstQuery()) == NULL)
                 continue;
             do {
-                cout << q->getName();
-
-                for (auto &x : substitutions) {
-                    //cout << x.first << ", " << x.second << endl;
-                    if (q->getName().compare(x.first) == 0 && q->setName(x.second))
-                        cout << " --> " << x.second;
+                DEBUG(q->getName());
+                for (auto &dnsname : substitutions) {
+                    if (q->getName().compare(dnsname.first) == 0 && q->setName(dnsname.second))
+                        DEBUG(" --> " << dnsname.second);
                 }
-
-                //if (q->getName().compare(from) == 0 && q->setName(to)) {
-                //    cout << " --> " << to;
-                //}
             } while ((q = response->getNextQuery(q)) != NULL);
             cout << endl;
 
