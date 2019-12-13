@@ -36,8 +36,10 @@ public:
     void VLANDoubleTagging();
     //LEV 4
     void multiplyTCP(int n) {
-        if (n < 0)
+        if (n < 0) {
+            cout << "Cool, but I cannot do that dude!" << endl;
             return;
+        }
         RawPacket inPacket;
         while (this->input->getNextPacket(inPacket)) {
             Packet parsedPacket(&inPacket);
@@ -47,7 +49,20 @@ public:
                 this->output->writePacket(inPacket);
         }
     };
-    void multiplyUDP(int n){};
+    void multiplyUDP(int n) {
+        if (n < 0) {
+            cout << "Cool, but I cannot do that dude!" << endl;
+            return;
+        }
+        RawPacket inPacket;
+        while (this->input->getNextPacket(inPacket)) {
+            Packet parsedPacket(&inPacket);
+            if (!parsedPacket.isPacketOfType(ProtocolType::UDP))
+                continue;
+            for (int i = 0; i < n; i++)
+                this->output->writePacket(inPacket);
+        }
+    };
     //LEV 5
     static void HTTPImageSubstitution(Packet packet) {
         //NOTE: non riesco a prendere l'immagine perchè è suddivisa su più frame e devo prima ricostruire i pacchetti tcp
