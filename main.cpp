@@ -5,6 +5,8 @@
 #include "pcapplusplus/IPv4Layer.h"
 #include "pcapplusplus/Packet.h"
 #include "pcapplusplus/PcapFileDevice.h"
+#include "pcapplusplus/PcapLiveDeviceList.h"
+#include "pcapplusplus/PlatformSpecificUtils.h"
 #include "pcapplusplus/TablePrinter.h"
 #include "pcapplusplus/TcpLayer.h"
 #include "stdlib.h"
@@ -26,6 +28,17 @@ static struct option CraftberryOptions[] =
 
 void help();
 void listInterfaces();
+
+static void onPacketArrives(pcpp::RawPacket *packet, pcpp::PcapLiveDevice *dev, void *cookie) {
+    // extract the stats object form the cookie
+    //PacketStats *stats = (PacketStats *)cookie;
+
+    // parsed the raw packet
+    //pcpp::Packet parsedPacket(packet);
+
+    // collect stats from packet
+    //stats->consumePacket(parsedPacket);
+}
 
 int main(int argc, char *argv[]) {
     string interfaceSrc = "", interfaceDst = "";
@@ -61,23 +74,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //DOC: apertura del file
-    string filename = "udpmult_01"; //"tcpmult_01"; //"dns_01";
-    IFileReaderDevice *input = IFileReaderDevice::getReader(("captures/" + filename + ".pcap").c_str());
-    PcapNgFileWriterDevice *output = new PcapNgFileWriterDevice(("captures/" + filename + "_out.pcapng").c_str());
-
-    if (input == NULL || !input->open()) {
-        cout << "Cannot open the input file for reading or cannot determine input for file type\n";
-        exit(1);
-    }
-    if (!output->open()) {
-        cout << "Cannot open the output file\n";
-        exit(1);
-    }
-    Crafter C(input, output);
+    Crafter C("192.168.1.10", "127.0.0.1");
 
     if (attackName.compare("DNS") == 0) {
-        C.DNSRobber({{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}});
+        //C.DNSRobber({{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}});
     } else if (attackName.compare("TCPMULTIPLY") == 0) {
         C.TCPmultiply(3);
     } else if (attackName.compare("UDPMULTIPLY") == 0) {
@@ -87,10 +87,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    C.getOutputStats();
-    //chiusura dei file
-    output->close();
-    input->close();
+    // sleep for 10 seconds in main thread, in the meantime packets are captured in the async thread
+    PCAP_SLEEP(10);
+
+    C.stopCapture();
 }
 
 //packetsContainer pakStat;
