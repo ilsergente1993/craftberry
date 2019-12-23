@@ -1,3 +1,4 @@
+#include "Attack.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -21,14 +22,13 @@
 using namespace std;
 using namespace pcpp;
 
-#include "Attack.cpp"
-
 class TcpMultiply : public Attack {
 
 public:
-    int n{2};
+    static const int level = 4;
+    int n;
 
-    TcpMultiply(){};
+    TcpMultiply() : n(0){};
     ~TcpMultiply(){};
     vector<RawPacket *> *craft(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);
@@ -37,6 +37,7 @@ public:
             for (int i = 0; i < this->n; i++) {
                 pp->push_back(inPacket);
             }
+            this->shots++;
         }
         return pp;
     }

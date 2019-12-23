@@ -11,6 +11,8 @@
 #include "pcapplusplus/TcpLayer.h"
 #include "stdlib.h"
 
+#include "DnsRobber.cpp"
+#include "TcpMultiply.cpp"
 #include "UdpMultiply.cpp"
 #include "crafter.hpp"
 #include "packetsContainer.hpp"
@@ -107,35 +109,28 @@ void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details) {
     vector<RawPacket *> *pToSend;
     Details *d = (Details *)details;
 
-    if (d->attackName.compare("DNS") == 0) {
-        //C.DNSRobber({{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}});
-    } else if (d->attackName.compare("TCPMULTIPLY") == 0) {
-        //C.TCPmultiply(3);
-    } else if (d->attackName.compare("UDPMULTIPLY") == 0) {
-        a = new UdpMultiply();
-    } else {
-        help();
-        exit(1);
-    }
+    // if (d->attackName.compare("UDPMULTIPLY") == 0) {
+    //     UdpMultiply attack;
+    //     vector<RawPacket *> *p = attack.craft(inPacket);
+    //     if (p->size() > 0) {
+    //         sendPacket(p, (Details *)details);
+    //         return;
+    //     }
+    // }
 
-    sendPacket(a->craft(inPacket), (Details *)details);
+    // if (d->attackName.compare("TCPMULTIPLY") == 0) {
+    //     TcpMultiply attack;
+    //     vector<RawPacket *> *p = attack.craft(inPacket);
+    //     if (p->size() > 0) {
+    //         sendPacket(p, (Details *)details);
+    //         return;
+    //     }
+    // }
+
+    ;
 }
 
 //packetsContainer pakStat;
-
-//Crafter::HTTPImageSubstitution(&parsedPacket);
-/*
-            Packet p = Crafter::multiplyTCP(parsedPacket);
-            cout << "len 1" << parsedPacket.getFirstLayer()->getDataLen() << " bytes" << endl;
-            cout << "len 2" << p.getFirstLayer()->getDataLen() << " bytes" << endl;
-            */
-
-//scorro tutti i layer
-//int i = 0;
-//for (Layer *curLayer = parsedPacket.getFirstLayer(); curLayer != NULL && i < 8; curLayer = curLayer->getNextLayer(), i++) {
-//pakStat.add(curLayer);
-// }
-//cout << inPacket.getFrameLength() << endl;
 
 //pakStat.printStats();
 

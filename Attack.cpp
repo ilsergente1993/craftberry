@@ -15,9 +15,18 @@
 #include "stdlib.h"
 #include "string.h"
 
+using namespace std;
+using namespace pcpp;
+
 class Attack {
+protected:
+    int shots;
+
 public:
-    Attack(){};
+    static const int level;
+    Attack() : shots(0){};
     ~Attack(){};
     virtual vector<RawPacket *> *craft(RawPacket *) = 0;
+
+    int getShots() { return this->shots; };
 };

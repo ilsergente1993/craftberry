@@ -1,3 +1,4 @@
+#include "Attack.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -21,42 +22,26 @@
 using namespace std;
 using namespace pcpp;
 
-struct Cuki;
-class Crafter;
-
-struct Cuki {
-    Crafter *myself;
-    void *data;
-    Cuki(Crafter *c, void *d) {
-        this->myself = c;
-        this->data = d;
-    };
-};
-
-class Crafter {
-private:
-    string interfaceSrc;
-    string interfaceDst;
-    PcapLiveDevice *devSrc;
-    PcapLiveDevice *devDst;
+class HTTPImageSubstitution : public Attack {
 
 public:
-    //LEV 2
-    void VLANDoubleTagging();
-    //LEV 4
+    static const int level = 4;
+    int n;
 
-    //LEV 5
-    static void HTTPImageSubstitution(Packet packet) {
+    HTTPImageSubstitution() : n(0){};
+    ~HTTPImageSubstitution(){};
+    vector<RawPacket *> *craft(RawPacket *inPacket) {
+        Packet parsedPacket(inPacket);
+        vector<RawPacket *> *pp = new vector<RawPacket *>();
+
         //NOTE: non riesco a prendere l'immagine perchè è suddivisa su più frame e devo prima ricostruire i pacchetti tcp
         //vedi: https://github.com/seladb/PcapPlusPlus/blob/master/Examples/TcpReassembly/main.cpp
-        HttpResponseLayer *response = packet.getLayerOfType<HttpResponseLayer>();
+        HttpResponseLayer *response = parsedPacket.getLayerOfType<HttpResponseLayer>();
         if (response == NULL)
-            return;
-
+            return nullptr;
         if (response->getFirstLine()->getStatusCodeAsInt() == 200) {
             ofstream image;
             image.open("passport.jpg", ios::binary);
-
             cout << "got 200 HTTP packet: " << response->getFirstLine()->getStatusCodeString() << endl;
             cout << response->getFieldByName(PCPP_HTTP_CONTENT_LENGTH_FIELD)->getFieldValue() << " bytes" << endl;
             uint8_t *p = response->getData();
@@ -68,7 +53,8 @@ public:
             cout << response->getLayerPayload() << endl;
             image.close();
         }
-    };
-
-    void HTTPContentCatcher(){};
+        // pp->push_back(inPacket);
+        // this->shots++;
+        return pp;
+    }
 };
