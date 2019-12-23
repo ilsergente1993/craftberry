@@ -21,6 +21,18 @@
 using namespace std;
 using namespace pcpp;
 
+struct Cuki;
+class Crafter;
+
+struct Cuki {
+    Crafter *myself;
+    void *data;
+    Cuki(Crafter *c, void *d) {
+        this->myself = c;
+        this->data = d;
+    };
+};
+
 class Crafter {
 private:
     string interfaceSrc;
@@ -32,71 +44,57 @@ public:
     Crafter(string _interfaceSrc, string _interfaceDst) {
         this->interfaceSrc = _interfaceSrc;
         this->interfaceDst = _interfaceDst;
-        this->devSrc = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(this->interfaceSrc.c_str());
-        this->devDst = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(this->interfaceDst.c_str());
-
-        //DOC: ottengo il device
-        if (this->devSrc == NULL || this->devDst == NULL) {
-            cout << "Cannot find interface with IPv4 address of '" << this->interfaceSrc.c_str() << "' or '"
-                 << this->interfaceDst.c_str() << "'\n";
-            exit(1);
-        }
-        //DOC: stampo informazioni dei device
-        this->deviceInfo();
-        //DOC: apro il device
-        if (!this->devSrc->open() || !this->devDst->open()) {
-            cout << "Cannot open the devices\n";
-            exit(1);
-        }
     };
-    void sendPacket(RawPacket *p) {
-        if (!this->devSrc->sendPacket(*p)) {
-            cout << "Couldn't send packet\n";
-            exit(1);
-        }
-        cout << "wrote " << p->getRawDataLen() << " B" << endl;
-    }
-    void stopCapture() {
-        this->devSrc->stopCapture();
-    }
 
     //LEV 2
     void VLANDoubleTagging();
     //LEV 4
     void TCPmultiply(int n) {
+        if (n < 0) {
+            cout << "Cool, but I cannot do that dude! 'n' must be greater than 0." << endl;
+            return;
+        }
+        Cuki c = {this, &n};
         devSrc->startCapture(
-            [](RawPacket *inPacket, PcapLiveDevice *dev, void *myself) {
-                // if (n < 0) {
-                //     cout << "Cool, but I cannot do that dude!" << endl;
-                //     return;
-                // }
+            [](RawPacket *inPacket, PcapLiveDevice *dev, void *cookie) {
                 Packet parsedPacket(inPacket);
                 if (!parsedPacket.isPacketOfType(ProtocolType::TCP))
                     return;
-                for (int i = 0; i < 3 /*n*/; i++) {
+
+                Cuki *c = static_cast<Cuki *>(cookie);
+                cout << " ---> " << (intptr_t)c->data << endl;
+                for (int i = 0; i < (intptr_t)c->data; i++) {
                     cout << "scrivo pacchetto tcp" << endl;
-                    static_cast<Crafter *>(myself)->sendPacket(inPacket);
+                    //c->myself->sendPacket(inPacket);
                 }
             },
-            nullptr);
+            &c);
     };
     void UDPmultiply(int n) {
+        if (n < 0) {
+            cout << "Cool, but I cannot do that dude! 'n' must be greater than 0." << endl;
+            return;
+        }
+        Cuki *c = new Cuki(this, &n);
+        cout << " -> YEAH: " << *(int *)(c->data) << " => " << (c->data) << endl;
+
         devSrc->startCapture(
-            [](RawPacket *inPacket, PcapLiveDevice *dev, void *myself) {
-                // if (n < 0) {
-                //     cout << "Cool, but I cannot do that dude!" << endl;
-                //     return;
-                // }
+            [](RawPacket *inPacket, PcapLiveDevice *dev, void *cookie) {
                 Packet parsedPacket(inPacket);
-                cout << "got a packet of " << inPacket->getRawDataLen() << " B from dev " << dev->getIPv4Address().toString() << endl;
+                DEBUG("got a packet of " << inPacket->getRawDataLen() << " B from dev " << dev->getIPv4Address().toString() << endl);
+
+                Cuki *c = (Cuki *)(cookie);
+                cout << " -> YEAH: " << *(int *)static_cast<void *>(c->data) << " => " << (c->data) << endl;
+
                 if (parsedPacket.isPacketOfType(ProtocolType::UDP)) {
-                    for (int i = 0; i < 3 /*n*/; i++) {
-                        cout << "scrivo pacchetto tcp" << endl;
-                        static_cast<Crafter *>(myself)->sendPacket(inPacket);
+                    for (int i = 0; i < 3; i++) {
+                        //cout << "scrivo pacchetto udp " << inPacket->getRawDataLen() << "B" << endl;
+                        //c->myself->sendPacket(inPacket);
                     }
                 }
+                exit(1);
             },
-            nullptr);
+            c);
     };
     //LEV 5
     static void HTTPImageSubstitution(Packet packet) {
@@ -126,54 +124,39 @@ public:
     void HTTPContentCatcher(){};
 
     //map di sostituzioni <from,to>
-    // void DNSRobber(map<string, string> substitutions) {
-    //     //TODO: adesso la sostituzione è in query ed in answer e ritorna malformed packet. Separare??
-    //     RawPacket inPacket;
-    //     while (this->input->getNextPacket(inPacket)) {
-    //         Packet parsedPacket(&inPacket);
-    //         DnsLayer *response = parsedPacket.getLayerOfType<DnsLayer>();
-    //         if (response == NULL)
-    //             continue;
-    //         DnsQuery *q;
-    //         if ((q = response->getFirstQuery()) == NULL)
-    //             continue;
-    //         do {
-    //             DEBUG(q->getName());
-    //             for (auto &dnsname : substitutions) {
-    //                 if (q->getName().compare(dnsname.first) == 0 && q->setName(dnsname.second))
-    //                     DEBUG(" --> " << dnsname.second << endl);
-    //             }
-    //         } while ((q = response->getNextQuery(q)) != NULL);
+    void DNSRobber(map<string, string> substitutions) {
+        //TODO: adesso la sostituzione è in query ed in answer e ritorna malformed packet. Separare??
+        if (substitutions.size() <= 0) {
+            cout << "Cool, but I cannot do that dude! the substitution map size must be greater than 0." << endl;
+            return;
+        }
+        Cuki c = {this, &substitutions};
+        devSrc->startCapture(
+            [](RawPacket *inPacket, PcapLiveDevice *dev, void *cookie) {
+                Packet parsedPacket(inPacket);
+                DnsLayer *response = parsedPacket.getLayerOfType<DnsLayer>();
+                if (response == NULL)
+                    return;
+                DnsQuery *q;
+                if ((q = response->getFirstQuery()) == NULL)
+                    return;
+                DEBUG("got a packet of " << inPacket->getRawDataLen() << " B from dev " << dev->getIPv4Address().toString() << endl);
+                Cuki c = *(Cuki *)(cookie);
+                do {
+                    DEBUG(q->getName());
+                    map<string, string> substitutions = *(map<string, string> *)(c.data);
+                    for (auto &dnsname : substitutions) {
+                        if (q->getName().compare(dnsname.first) == 0 && q->setName(dnsname.second))
+                            DEBUG(" --> " << dnsname.second << endl);
+                    }
+                } while ((q = response->getNextQuery(q)) != NULL);
+                cout << "scrivo pacchetto udp" << endl;
+                //c.myself->sendPacket(parsedPacket.getRawPacket());
+            },
+            &c);
+    };
 
-    //         parsedPacket.computeCalculateFields();
-    //         //this->output->writePacket(*parsedPacket.getRawPacket());
-    //     }
-    // };
-
-    //void getOutputStats() {
-    // create the stats object
-    //pcap_stat stats;
-    //this->output->getStatistics(stats);
-    //cout << "Written " << stats.ps_recv << " packets successfully to pcap-ng writer and " << stats.ps_drop << " packets could not be written\n";
-    //}
-
-    void deviceInfo() {
-        cout << "Interface Src info:\n";
-        cout << "   Interface name:        " << this->devSrc->getName() << endl;
-        cout << "   Interface description: " << this->devSrc->getDesc() << endl;
-        cout << "   MAC address:           " << this->devSrc->getMacAddress().toString().c_str() << endl;
-        cout << "   Default gateway:       " << this->devSrc->getDefaultGateway().toString().c_str() << endl;
-        cout << "   Interface MTU:        " << this->devSrc->getMtu() << endl;
-        if (this->devSrc->getDnsServers().size() > 0)
-            cout << "   DNS server:            " << this->devSrc->getDnsServers().at(0).toString().c_str() << endl;
-
-        cout << "Interface Src info:\n";
-        cout << "   Interface name:        " << this->devDst->getName() << endl;
-        cout << "   Interface description: " << this->devDst->getDesc() << endl;
-        cout << "   MAC address:           " << this->devDst->getMacAddress().toString().c_str() << endl;
-        cout << "   Default gateway:       " << this->devDst->getDefaultGateway().toString().c_str() << endl;
-        cout << "   Interface MTU:         " << this->devDst->getMtu() << endl;
-        if (this->devDst->getDnsServers().size() > 0)
-            cout << "   DNS server:            " << this->devDst->getDnsServers().at(0).toString().c_str() << endl;
+    void stopCapture() {
+        this->devSrc->stopCapture();
     }
 };

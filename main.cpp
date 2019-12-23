@@ -11,6 +11,7 @@
 #include "pcapplusplus/TcpLayer.h"
 #include "stdlib.h"
 
+#include "UdpMultiply.cpp"
 #include "crafter.hpp"
 #include "packetsContainer.hpp"
 
@@ -26,28 +27,34 @@ static struct option CraftberryOptions[] =
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
 
+struct Details {
+    string attackName;
+    string interfaceSrc;
+    string interfaceDst;
+    PcapLiveDevice *devSrc;
+    PcapLiveDevice *devDst;
+    void *data;
+    Details(string _attackName, string _interfaceSrc, string _interfaceDst, PcapLiveDevice *_devSrc, PcapLiveDevice *_devDst) : data(0) {
+        attackName = _attackName;
+        interfaceSrc = _interfaceSrc;
+        interfaceDst = _interfaceDst;
+        devSrc = _devSrc;
+        devDst = _devDst;
+    };
+};
 void help();
+void init(Details *);
+void deviceInfo(Details *);
+void callback(RawPacket *, PcapLiveDevice *, void *);
 void listInterfaces();
-
-static void onPacketArrives(pcpp::RawPacket *packet, pcpp::PcapLiveDevice *dev, void *cookie) {
-    // extract the stats object form the cookie
-    //PacketStats *stats = (PacketStats *)cookie;
-
-    // parsed the raw packet
-    //pcpp::Packet parsedPacket(packet);
-
-    // collect stats from packet
-    //stats->consumePacket(parsedPacket);
-}
+void sendPacket(vector<RawPacket *> *, Details *);
 
 int main(int argc, char *argv[]) {
     string interfaceSrc = "", interfaceDst = "";
     string attackName = "", defenseName = "";
     int optionIndex = 0;
     char opt = 0;
-    //cout << argc << " = " << argv[0] << argv[1] << endl;
     while ((opt = getopt_long(argc, argv, "ABa:d:lh", CraftberryOptions, &optionIndex)) != -1) {
-        //cout << " -- > " << opt << endl;
         switch (opt) {
         case 0:
             break;
@@ -74,23 +81,44 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    Crafter C("192.168.1.10", "127.0.0.1");
+    PcapLiveDevice *devSrc;
+    PcapLiveDevice *devDst;
 
-    if (attackName.compare("DNS") == 0) {
+    struct Details *d = new Details{attackName, "172.22.35.109", "127.0.0.1", devSrc, devDst};
+
+    //DOC: inizializzazione
+    init(d);
+    //DOC: stampo informazioni dei device
+    deviceInfo(d);
+    //DOC: avvio la ricezione dei pacchetti
+    devSrc->startCapture(callback, &d);
+    cout << "working" << endl;
+
+    //PCAP_SLEEP(10);
+    while (1)
+        ;
+    //C.stopCapture();
+}
+
+void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details) {
+    DEBUG("got a packet of " << inPacket->getRawDataLen() << " B from dev " << devSrc->getIPv4Address().toString() << endl);
+
+    Attack *a;
+    vector<RawPacket *> *pToSend;
+    Details *d = (Details *)details;
+
+    if (d->attackName.compare("DNS") == 0) {
         //C.DNSRobber({{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}});
-    } else if (attackName.compare("TCPMULTIPLY") == 0) {
-        C.TCPmultiply(3);
-    } else if (attackName.compare("UDPMULTIPLY") == 0) {
-        C.UDPmultiply(3);
+    } else if (d->attackName.compare("TCPMULTIPLY") == 0) {
+        //C.TCPmultiply(3);
+    } else if (d->attackName.compare("UDPMULTIPLY") == 0) {
+        a = new UdpMultiply();
     } else {
         help();
         exit(1);
     }
 
-    // sleep for 10 seconds in main thread, in the meantime packets are captured in the async thread
-    PCAP_SLEEP(10);
-
-    C.stopCapture();
+    sendPacket(a->craft(inPacket), (Details *)details);
 }
 
 //packetsContainer pakStat;
@@ -149,4 +177,56 @@ void listInterfaces() {
     printer.printSeparator();
 
     exit(0);
+}
+
+void init(Details *d) {
+    d->devSrc = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(d->interfaceSrc.c_str());
+    d->devDst = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(d->interfaceDst.c_str());
+
+    //DOC: ottengo il device
+    if (d->devSrc == NULL || d->devDst == NULL) {
+        cout << "Cannot find interface with IPv4 address of '" << d->interfaceSrc << "' or '" << d->interfaceDst << "'\n";
+        exit(1);
+    }
+    //DOC: apro il device
+    if (!d->devSrc->open() || !d->devDst->open()) {
+        cout << "Cannot open the devices\n";
+        exit(1);
+    }
+}
+
+void sendPacket(vector<RawPacket *> *pToSend, Details *d) {
+    int cont = 0;
+    double size = 0;
+    for (auto p : *pToSend) {
+        if (!d->devSrc->sendPacket(*p)) {
+            cout << "Couldn't send packet\n";
+            exit(1);
+        }
+        cont++;
+        size += p->getRawDataLen();
+    }
+    DEBUG("wrote " << cont << " packets for a total of " << size << " B" << endl);
+}
+
+void deviceInfo(Details *d) {
+    cout << "Interface Src info:\n";
+    cout << "   IP:                    " << d->devSrc->getIPv4Address().toString() << endl;
+    cout << "   Interface name:        " << d->devSrc->getName() << endl;
+    cout << "   Interface description: " << d->devSrc->getDesc() << endl;
+    cout << "   MAC address:           " << d->devSrc->getMacAddress().toString() << endl;
+    cout << "   Default gateway:       " << d->devSrc->getDefaultGateway().toString() << endl;
+    cout << "   Interface MTU:         " << d->devSrc->getMtu() << endl;
+    if (d->devSrc->getDnsServers().size() > 0)
+        cout << "   DNS server:            " << d->devSrc->getDnsServers().at(0).toString() << endl;
+
+    cout << "Interface Dst info:\n";
+    cout << "   IP:                    " << d->devDst->getIPv4Address().toString() << endl;
+    cout << "   Interface name:        " << d->devDst->getName() << endl;
+    cout << "   Interface description: " << d->devDst->getDesc() << endl;
+    cout << "   MAC address:           " << d->devDst->getMacAddress().toString() << endl;
+    cout << "   Default gateway:       " << d->devDst->getDefaultGateway().toString() << endl;
+    cout << "   Interface MTU:         " << d->devDst->getMtu() << endl;
+    if (d->devDst->getDnsServers().size() > 0)
+        cout << "   DNS server:            " << d->devDst->getDnsServers().at(0).toString() << endl;
 }
