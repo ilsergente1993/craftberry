@@ -14,11 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEBUG(x)        \
-    do {                \
-        std::cerr << x; \
-    } while (0)
-
 using namespace std;
 using namespace pcpp;
 

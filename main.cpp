@@ -1,5 +1,6 @@
 #include "arpa/inet.h"
 #include "getopt.h"
+#include "iostream"
 #include "pcapplusplus/EthLayer.h"
 #include "pcapplusplus/HttpLayer.h"
 #include "pcapplusplus/IPv4Layer.h"
@@ -10,7 +11,12 @@
 #include "pcapplusplus/TablePrinter.h"
 #include "pcapplusplus/TcpLayer.h"
 #include "stdlib.h"
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
+#include "Details.cpp"
 #include "DnsRobber.cpp"
 #include "TcpMultiply.cpp"
 #include "UdpMultiply.cpp"
@@ -30,30 +36,28 @@ static struct option CraftberryOptions[] =
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
 
-struct Details {
-    string method;
-    string interfaceSrc;
-    string interfaceDst;
-    PcapLiveDevice *devSrc;
-    PcapLiveDevice *devDst;
-    void *data;
-    Details(string _method, string _interfaceSrc, string _interfaceDst, PcapLiveDevice *_devSrc, PcapLiveDevice *_devDst) : data(0) {
-        method = _method;
-        interfaceSrc = _interfaceSrc;
-        interfaceDst = _interfaceDst;
-        devSrc = _devSrc;
-        devDst = _devDst;
-    };
-};
 void help();
-void init(Details *);
-void deviceInfo(Details *);
 static void callback(RawPacket *, PcapLiveDevice *, void *);
 static void onPacketArrives(pcpp::RawPacket *, pcpp::PcapLiveDevice *, void *);
 void listInterfaces();
-void sendPacket(vector<RawPacket *> *, Details *);
+struct Details *gd;
+
+void ctrlc(int s) {
+    printf("\nOoooops got ctrl+c signal (%d)\nHere a summary of what happened:", s);
+    gd->stats();
+    delete gd;
+    cout << "bye bye" << endl;
+    exit(1);
+}
 
 int main(int argc, char *argv[]) {
+    //DOC: setup per ctrl+c management
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = ctrlc;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
+    sigaction(SIGINT, &sigIntHandler, NULL);
+
     string interfaceSrc = "", interfaceDst = "";
     string attackName = "", defenseName = "";
     int optionIndex = 0;
@@ -84,59 +88,42 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    PcapLiveDevice *devSrc = 0;
-    PcapLiveDevice *devDst = 0;
-
     if (attackName.length() > 0 && defenseName.length() > 0) {
         cout << "Dude, or attack or defence. Just decide!" << endl;
         exit(1);
     }
 
-    struct Details *d = new Details{attackName.length() > 0 ? attackName : defenseName,
-                                    "172.28.46.141",
-                                    "127.0.0.1",
-                                    devSrc,
-                                    devDst};
+    gd = new Details{attackName.length() > 0 ? attackName : defenseName, "172.28.46.141", "192.168.50.5"};
 
-    //DOC: inizializzazione
-    init(d);
-    //DOC: stampo informazioni dei device
-    deviceInfo(d);
+    gd->ToString();
+
     //DOC: avvio la ricezione dei pacchetti
-    //devSrc->startCapture(callback, d);
-    devSrc->startCapture(onPacketArrives, 0);
 
-    cerr << "working" << endl;
+    int cont = 0;
+
+    gd->devSrc->startCapture(callback, gd);
+
+    cout << "working..." << endl;
 
     //PCAP_SLEEP(10);
-    while (1)
-        ;
-    //C.stopCapture();
-}
-static void onPacketArrives(pcpp::RawPacket *packet, pcpp::PcapLiveDevice *dev, void *cookie) {
-    // extract the stats object form the cookie
-    //PacketStats* stats = (PacketStats*)cookie;
+    while (1) {
+    };
 
-    cout << "yeah" << endl;
-    // parsed the raw packet
-    pcpp::Packet parsedPacket(packet);
-    cout << "Got " << parsedPacket.getRawPacket()->getRawDataLen() << " B" << endl;
-    // collect stats from packet
-    //stats->consumePacket(parsedPacket);
+    delete gd;
+    return 0;
 }
 
 static void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details) {
-    return;
-    DEBUG("got a packet of " << inPacket->getRawDataLen() << " B from dev " << devSrc->getIPv4Address().toString() << endl);
-
+    DEBUG("<- got a packet of " << inPacket->getRawDataLen() << " B from dev " << devSrc->getIPv4Address().toString() << endl);
+    //return;
     //Attack *a;
     vector<RawPacket *> *pToSend;
     Details *d = (Details *)details;
 
-    if (d->method.compare("SILENT") == 0) {
+    if (d->method.compare("BEQUITE") == 0) {
         pToSend = new vector<RawPacket *>();
         pToSend->push_back(inPacket);
-        sendPacket(pToSend, (Details *)details);
+        Details::sendPacket(pToSend, d);
         return;
     }
 
@@ -144,7 +131,7 @@ static void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details)
         UdpMultiply attack;
         pToSend = attack.craft(inPacket);
         if (pToSend->size() > 0) {
-            sendPacket(pToSend, (Details *)details);
+            Details::sendPacket(pToSend, d);
             return;
         }
     }
@@ -153,7 +140,7 @@ static void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details)
         TcpMultiply attack;
         pToSend = attack.craft(inPacket);
         if (pToSend->size() > 0) {
-            sendPacket(pToSend, (Details *)details);
+            Details::sendPacket(pToSend, d);
             return;
         }
     }
@@ -184,7 +171,7 @@ static void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details)
         TcpMultiply attack;
         pToSend = attack.craft(inPacket);
         if (pToSend->size() > 0) {
-            sendPacket(pToSend, (Details *)details);
+            Details::sendPacket(pToSend, d);
             return;
         }
     }
@@ -202,7 +189,7 @@ void help() {
             "    -l                : Print the list of interfaces and exists\n"
             "    -h                : Displays this help message and exits\n"
             "\nATTACKNAME:\n"
-            "    SILENT         : just replying all the traffic from src to dst\n"
+            "    BEQUITE        : just replying all the traffic from src to dst\n"
             "    DNS            : catch the DNS queries and replace its value\n"
             "    HTTP           : description\n"
             "    HTTPIMAGE      : description\n"
@@ -215,9 +202,8 @@ void help() {
 
 void listInterfaces() {
     // create the table
-    cout << endl
-         << "Network interfaces" << endl;
-    TablePrinter printer({"Name", "IP address"}, {20, 20});
+    cout << "Network interfaces" << endl;
+    pcpp::TablePrinter printer({"Name", "IP address"}, {20, 20});
 
     const vector<PcapLiveDevice *> &devList = PcapLiveDeviceList::getInstance().getPcapLiveDevicesList();
     for (vector<PcapLiveDevice *>::const_iterator iter = devList.begin(); iter != devList.end(); iter++) {
@@ -226,58 +212,15 @@ void listInterfaces() {
         //printf("    -> Name: '%s'   IP address: %s\n", (*iter)->getName(), (*iter)->getIPv4Address().toString().c_str());
     }
     printer.printSeparator();
-
     exit(0);
 }
 
-void init(Details *d) {
-    d->devSrc = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(d->interfaceSrc.c_str());
-    d->devDst = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(d->interfaceDst.c_str());
-
-    //DOC: ottengo il device
-    if (d->devSrc == NULL || d->devDst == NULL) {
-        cout << "Cannot find interface with IPv4 address of '" << d->interfaceSrc << "' or '" << d->interfaceDst << "'\n";
-        exit(1);
-    }
-    //DOC: apro il device
-    if (!d->devSrc->open() || !d->devDst->open()) {
-        cout << "Cannot open the devices\n";
-        exit(1);
-    }
-}
-
-void sendPacket(vector<RawPacket *> *pToSend, Details *d) {
-    int cont = 0;
-    double size = 0;
-    for (auto p : *pToSend) {
-        if (!d->devSrc->sendPacket(*p)) {
-            cout << "Couldn't send packet\n";
-            exit(1);
-        }
-        cont++;
-        size += p->getRawDataLen();
-    }
-    DEBUG("wrote " << cont << " packets for a total of " << size << " B" << endl);
-}
-
-void deviceInfo(Details *d) {
-    cout << "Interface Src info:\n";
-    cout << "   IP:                    " << d->devSrc->getIPv4Address().toString() << endl;
-    cout << "   Interface name:        " << d->devSrc->getName() << endl;
-    cout << "   Interface description: " << d->devSrc->getDesc() << endl;
-    cout << "   MAC address:           " << d->devSrc->getMacAddress().toString() << endl;
-    cout << "   Default gateway:       " << d->devSrc->getDefaultGateway().toString() << endl;
-    cout << "   Interface MTU:         " << d->devSrc->getMtu() << endl;
-    if (d->devSrc->getDnsServers().size() > 0)
-        cout << "   DNS server:            " << d->devSrc->getDnsServers().at(0).toString() << endl;
-
-    cout << "Interface Dst info:\n";
-    cout << "   IP:                    " << d->devDst->getIPv4Address().toString() << endl;
-    cout << "   Interface name:        " << d->devDst->getName() << endl;
-    cout << "   Interface description: " << d->devDst->getDesc() << endl;
-    cout << "   MAC address:           " << d->devDst->getMacAddress().toString() << endl;
-    cout << "   Default gateway:       " << d->devDst->getDefaultGateway().toString() << endl;
-    cout << "   Interface MTU:         " << d->devDst->getMtu() << endl;
-    if (d->devDst->getDnsServers().size() > 0)
-        cout << "   DNS server:            " << d->devDst->getDnsServers().at(0).toString() << endl;
+static void onPacketArrives(pcpp::RawPacket *packet, pcpp::PcapLiveDevice *dev, void *d) {
+    cout << "I'm in" << endl;
+    //(*(int *)cont)++;
+    struct Details *dd = (Details *)d;
+    cout << dd->method << endl;
+    cout << dev->isOpened() << endl;
+    pcpp::Packet parsedPacket(packet);
+    cout << "Got " << parsedPacket.getRawPacket()->getRawDataLen() << " B" << endl;
 }

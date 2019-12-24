@@ -1,6 +1,7 @@
 #pragma once
 
 // This is high quality software because the includes are sorted alphabetically.
+#include "iostream"
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
