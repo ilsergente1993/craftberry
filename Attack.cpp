@@ -1,5 +1,5 @@
 //DOC: abstract class parent of every single attack implementation
-
+#pragma once
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"

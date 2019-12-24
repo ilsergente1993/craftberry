@@ -25,7 +25,7 @@ using namespace pcpp;
 class HTTPImageSubstitution : public Attack {
 
 public:
-    static const int level = 4;
+    static const int level = 5;
     int n;
 
     HTTPImageSubstitution() : n(0){};
