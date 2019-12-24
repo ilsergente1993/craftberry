@@ -15,9 +15,9 @@
 #include "stdlib.h"
 #include "string.h"
 
-#define DEBUG(x)        \
-    do {                \
-        std::cerr << x; \
+#define DEBUG(x)                \
+    do {                        \
+        std::cerr << "\t" << x; \
     } while (0);
 
 using namespace std;

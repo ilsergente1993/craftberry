@@ -1,6 +1,5 @@
 #include "arpa/inet.h"
 #include "getopt.h"
-#include "iostream"
 #include "pcapplusplus/EthLayer.h"
 #include "pcapplusplus/HttpLayer.h"
 #include "pcapplusplus/IPv4Layer.h"
@@ -11,6 +10,7 @@
 #include "pcapplusplus/TablePrinter.h"
 #include "pcapplusplus/TcpLayer.h"
 #include "stdlib.h"
+#include <iostream>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,24 +21,23 @@
 #include "TcpMultiply.cpp"
 #include "UdpMultiply.cpp"
 #include "chacha20.hpp"
-#include "crafter.hpp"
 #include "packetsContainer.hpp"
 
 using namespace std;
 using namespace pcpp;
 
 static struct option CraftberryOptions[] =
-    {{"interfaceSrc", required_argument, 0, 'A'},
-     {"interfaceDst", required_argument, 0, 'B'},
+    {{"interfac_src", required_argument, 0, 'A'},
+     {"interface_dst", required_argument, 0, 'B'},
      {"attack", required_argument, 0, 'a'},
      {"defense", required_argument, 0, 'd'},
+     {"timeout", required_argument, 0, 't'},
      {"list-interfaces", no_argument, 0, 'l'},
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
 
 void help();
 static void callback(RawPacket *, PcapLiveDevice *, void *);
-static void onPacketArrives(pcpp::RawPacket *, pcpp::PcapLiveDevice *, void *);
 void listInterfaces();
 struct Details *gd;
 
@@ -51,7 +50,7 @@ void ctrlc(int s) {
 }
 
 int main(int argc, char *argv[]) {
-    //DOC: setup per ctrl+c management
+    //DOC: setup for ctrl+c signal
     struct sigaction sigIntHandler;
     sigIntHandler.sa_handler = ctrlc;
     sigemptyset(&sigIntHandler.sa_mask);
@@ -60,9 +59,10 @@ int main(int argc, char *argv[]) {
 
     string interfaceSrc = "", interfaceDst = "";
     string attackName = "", defenseName = "";
-    int optionIndex = 0;
+    int optionIndex = 0, timeout = 0;
     char opt = 0;
-    while ((opt = getopt_long(argc, argv, "ABa:d:lh", CraftberryOptions, &optionIndex)) != -1) {
+    //':' significa che si aspetta degli argomenti
+    while ((opt = getopt_long(argc, argv, "A:B:a:d:t:lh", CraftberryOptions, &optionIndex)) != -1) {
         switch (opt) {
         case 0:
             break;
@@ -78,6 +78,9 @@ int main(int argc, char *argv[]) {
         case 'd':
             defenseName = optarg;
             break;
+        case 't':
+            timeout = atoi(optarg);
+            break;
         case 'l':
             listInterfaces();
             break;
@@ -89,36 +92,38 @@ int main(int argc, char *argv[]) {
     }
 
     if (attackName.length() > 0 && defenseName.length() > 0) {
-        cout << "Dude, or attack or defence. Just decide!" << endl;
+        cout << "Dude, attack or defence. Just decide!" << endl;
         exit(1);
     }
+    gd = new Details{attackName.length() > 0 ? attackName : defenseName, interfaceSrc, interfaceDst}; //"172.28.46.141", "192.168.50.5"
+    gd->toString();
 
-    gd = new Details{attackName.length() > 0 ? attackName : defenseName, "172.28.46.141", "192.168.50.5"};
-
-    gd->ToString();
-
-    //DOC: avvio la ricezione dei pacchetti
-
-    int cont = 0;
-
+    //DOC: start packet capturing
     gd->devSrc->startCapture(callback, gd);
-
-    cout << "working..." << endl;
-
-    //PCAP_SLEEP(10);
-    while (1) {
-    };
+    if (timeout == 0) {
+        cout << "Working in infinite mode, press ctrl+c to exit..." << endl;
+        while (1) {
+            //DOC: I quit when someone press ctrl+c
+        };
+    } else {
+        while (--timeout >= 0) {
+            PCAP_SLEEP(1);
+            if (timeout > 0)
+                cout << timeout << " seconds left" << endl;
+        };
+        cout << "Finished" << endl;
+    }
 
     delete gd;
     return 0;
 }
 
 static void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details) {
-    DEBUG("<- got a packet of " << inPacket->getRawDataLen() << " B from dev " << devSrc->getIPv4Address().toString() << endl);
-    //return;
-    //Attack *a;
+    DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
     vector<RawPacket *> *pToSend;
     Details *d = (Details *)details;
+    d->totalByteReceived += inPacket->getRawDataLen();
+    d->totalPacketsReceived++;
 
     if (d->method.compare("BEQUITE") == 0) {
         pToSend = new vector<RawPacket *>();
@@ -180,7 +185,7 @@ static void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details)
 void help() {
     cout << "\nUsage: Craftberry options:\n"
             "-------------------------\n"
-            " -A interface src -B interface dst { -a ATTACKNAME | -d DEFENSENAME }\n"
+            " -A interface_src -B interface_dst { -a ATTACKNAME | -d DEFENSENAME }\n"
             "\nOptions:\n"
             "    -A interface src  : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
             "    -B interface dst  : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
@@ -201,10 +206,8 @@ void help() {
 }
 
 void listInterfaces() {
-    // create the table
     cout << "Network interfaces" << endl;
     pcpp::TablePrinter printer({"Name", "IP address"}, {20, 20});
-
     const vector<PcapLiveDevice *> &devList = PcapLiveDeviceList::getInstance().getPcapLiveDevicesList();
     for (vector<PcapLiveDevice *>::const_iterator iter = devList.begin(); iter != devList.end(); iter++) {
         printer.printRow({(*iter)->getName(), (*iter)->getIPv4Address().toString()});
@@ -212,15 +215,4 @@ void listInterfaces() {
         //printf("    -> Name: '%s'   IP address: %s\n", (*iter)->getName(), (*iter)->getIPv4Address().toString().c_str());
     }
     printer.printSeparator();
-    exit(0);
-}
-
-static void onPacketArrives(pcpp::RawPacket *packet, pcpp::PcapLiveDevice *dev, void *d) {
-    cout << "I'm in" << endl;
-    //(*(int *)cont)++;
-    struct Details *dd = (Details *)d;
-    cout << dd->method << endl;
-    cout << dev->isOpened() << endl;
-    pcpp::Packet parsedPacket(packet);
-    cout << "Got " << parsedPacket.getRawPacket()->getRawDataLen() << " B" << endl;
 }

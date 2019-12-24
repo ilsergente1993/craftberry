@@ -18,15 +18,12 @@ using namespace std;
 using namespace pcpp;
 
 struct Details {
-private:
+public:
     double totalByteReceived{0};
     double totalPacketsReceived{0};
     double totalByteSent{0};
     double totalPacketsSent{0};
-    double totalBytesCrafted{0};
-    double totalPacketsCrafted{0};
 
-public:
     string method;
     string intSrc;
     string intDst;
@@ -36,10 +33,8 @@ public:
 
     Details(string _method, string _interfaceSrc, string _interfaceDst) : data(0) {
         method = _method;
-        intSrc = _interfaceSrc;
-        intDst = _interfaceDst;
-        devSrc = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(intSrc.c_str());
-        devDst = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(intDst.c_str());
+        devSrc = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp((intSrc = _interfaceSrc).c_str());
+        devDst = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp((intDst = _interfaceDst).c_str());
         //DOC: ottengo il device
         if (devSrc == NULL || devDst == NULL) {
             cout << "Cannot find interface with IPv4 address of '" << intSrc << "' or '" << intDst << "'\n";
@@ -67,7 +62,7 @@ public:
         cout << "All is clean" << endl;
     }
 
-    void ToString() {
+    void toString() {
         cout << "0---------------------------------------------------------0" << endl;
         cout << "\tMethod:                " << method << endl;
         cout << "\tAddress Data:          " << data << endl;
@@ -103,7 +98,6 @@ public:
         cout << endl;
         cout << "   Packets received:      " << totalPacketsReceived << " (" << totalByteReceived << " bytes)" << endl;
         cout << "   Packets sent:          " << totalPacketsSent << " (" << totalByteSent << " bytes)" << endl;
-        cout << "   Packets crafted:       " << totalPacketsCrafted << " (" << totalBytesCrafted << " bytes)" << endl;
     };
 
     static void sendPacket(vector<RawPacket *> *pToSend, Details *d) {
@@ -117,7 +111,9 @@ public:
                 cont++;
                 size += p->getRawDataLen();
             }
+            d->totalByteSent += size;
+            d->totalPacketsSent += cont;
         }
-        DEBUG("-> sent " << cont << " packets for a total of " << size << " B to " << d->devDst->getIPv4Address().toString() << endl);
+        DEBUG("-> " << cont << " packets (" << size << " B) to " << d->devDst->getIPv4Address().toString() << endl);
     }
 };
