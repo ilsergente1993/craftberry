@@ -1,4 +1,4 @@
-//DOC: abstract class parent of every single attack implementation
+//DOC: abstract class parent of every single action implementation
 #pragma once
 #include "fstream"
 #include "iostream"
@@ -23,15 +23,15 @@
 using namespace std;
 using namespace pcpp;
 
-class Attack {
+class Action {
 
 protected:
     int shots;
 
 public:
     static const int level;
-    Attack() : shots(0){};
-    ~Attack(){};
+    Action() : shots(0){};
+    ~Action(){};
     virtual vector<RawPacket *> *craft(RawPacket *) = 0;
 
     int getShots() { return this->shots; };

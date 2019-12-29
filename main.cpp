@@ -25,8 +25,7 @@ using namespace pcpp;
 static struct option CraftberryOptions[] =
     {{"interfac_src", required_argument, 0, 'A'},
      {"interface_dst", required_argument, 0, 'B'},
-     {"attack", required_argument, 0, 'a'},
-     {"defense", required_argument, 0, 'd'},
+     {"action", required_argument, 0, 'a'},
      {"timeout", required_argument, 0, 't'},
      {"list-interfaces", no_argument, 0, 'l'},
      {"help", no_argument, 0, 'h'},
@@ -39,7 +38,7 @@ struct Details *gd;
 
 void ctrlc(int s) {
     printf("\nOoooops got ctrl+c signal (%d)\nHere a summary of what happened:", s);
-    gd->statistics();
+    gd->summary();
     delete gd;
     cout << "bye bye" << endl;
     exit(1);
@@ -54,11 +53,11 @@ int main(int argc, char *argv[]) {
     sigaction(SIGINT, &sigIntHandler, NULL);
 
     string interfaceSrc = "", interfaceDst = "";
-    string attackName = "", defenseName = "";
+    string action = "";
     int optionIndex = 0, timeout = 0;
     char opt = 0;
     //':' significa che si aspetta degli argomenti
-    while ((opt = getopt_long(argc, argv, "A:B:a:d:t:lh", CraftberryOptions, &optionIndex)) != -1) {
+    while ((opt = getopt_long(argc, argv, "A:B:a:t:lh", CraftberryOptions, &optionIndex)) != -1) {
         switch (opt) {
         case 0:
             break;
@@ -69,10 +68,7 @@ int main(int argc, char *argv[]) {
             interfaceDst = optarg;
             break;
         case 'a':
-            attackName = optarg;
-            break;
-        case 'd':
-            defenseName = optarg;
+            action = optarg;
             break;
         case 't':
             timeout = atoi(optarg);
@@ -87,11 +83,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (attackName.length() > 0 && defenseName.length() > 0) {
-        cout << "Dude, attack or defence. Just decide!" << endl;
+    if (action.length() <= 0) {
+        cout << "Dude, let's do some action!" << endl;
         exit(1);
     }
-    gd = new Details{attackName.length() > 0 ? attackName : defenseName, interfaceSrc, interfaceDst}; //"172.28.46.141", "192.168.50.5"
+    gd = new Details{action, interfaceSrc, interfaceDst}; //"172.28.46.141", "192.168.50.5"
     gd->toString();
 
     //DOC: start packet capturing
@@ -108,7 +104,7 @@ int main(int argc, char *argv[]) {
                 cout << timeout << " seconds left" << endl;
         };
         cout << "Finished" << endl;
-        gd->statistics();
+        gd->summary();
     }
 
     delete gd;
@@ -118,24 +114,25 @@ int main(int argc, char *argv[]) {
 void help() {
     cout << "\nUsage: Craftberry options:\n"
             "-------------------------\n"
-            " -A interface_src -B interface_dst { -a ATTACKNAME | -d DEFENSENAME }\n"
+            " -A interface_src -B interface_dst -a { ATTACK | DEFENSE }\n"
             "\nOptions:\n"
-            "    -A interface src  : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
-            "    -B interface dst  : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
-            "    -a                : Use the specified attack\n"
-            "    -d                : Use the specified defence\n"
-            "    -t                : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)\n"
-            "    -l                : Print the list of interfaces and exists\n"
-            "    -h                : Displays this help message and exits\n"
-            "\nATTACKNAME:\n"
-            "    BEQUITE        : just replying all the traffic from src to dst\n"
-            "    DNS            : catch the DNS queries and replace its value\n"
-            "    HTTP           : description\n"
-            "    HTTPIMAGE      : description\n"
-            "    TCPMULTIPY     : multiply N times every tcp packet to dst\n"
-            "    UDPMULTIPY     : multiply N times every udp packet to dst\n"
-            "\nDEFENSENAME:\n"
-            "    CHACHA20       : description\n";
+            "    -A            : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
+            "    -B            : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
+            "    -a            : Use the specified action\n"
+            "    -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)\n"
+            "    -l            : Print the list of interfaces and exists\n"
+            "    -h            : Displays this help message and exits\n"
+            "\nActions:\n"
+            "   - default:\n"
+            "       BEQUITE    : just replying all the traffic from src to dst\n"
+            "   - ATTACK:\n"
+            "       DNS        : catch the DNS queries and replace its value\n"
+            "       HTTP       : description\n"
+            "       HTTPIMAGE  : description\n"
+            "       TCPMULTIPY : multiply N times every tcp packet to dst\n"
+            "       UDPMULTIPY : multiply N times every udp packet to dst\n"
+            "   - DEFENSE:\n"
+            "       CHACHA20   : description\n";
     exit(0);
 }
 

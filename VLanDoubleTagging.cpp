@@ -1,4 +1,4 @@
-#include "Attack.cpp"
+#include "Action.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -17,7 +17,7 @@
 using namespace std;
 using namespace pcpp;
 
-class VLanDoubleTagging : public Attack {
+class VLanDoubleTagging : public Action {
 
 public:
     static const int level = 2;

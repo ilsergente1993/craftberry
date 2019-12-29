@@ -9,7 +9,7 @@ craftberry -A interface_src -B interface_dst { -a ATTACKNAME | -d DEFENSENAME }
 ```
     -A interface src  : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address
     -B interface dst  : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address
-    -a                : Use the specified attack
+    -a                : Use the specified action
     -d                : Use the specified defence
     -t                : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)
     -l                : Print the list of interfaces and exists
@@ -40,6 +40,6 @@ sudo tcpreplay -i <interface> --loop=10 --loopdelay-ms=1000 <pcap_file>
 
 
 #### Roadmap
-- [X] **PoC attacks** (work in progress)
+- [X] **PoC actions** (work in progress)
 - [ ] PoC prevention systems
 - [ ] Reputation systems integration

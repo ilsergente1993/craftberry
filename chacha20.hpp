@@ -1,8 +1,8 @@
 #pragma once
 
 // This is high quality software because the includes are sorted alphabetically.
-#include "iostream"
 #include <assert.h>
+#include <iostream>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -56,27 +56,22 @@ Bytes raw_to_hex(const Bytes &src) {
 struct Chacha20Block {
     // This is basically a random number generator seeded with key and nonce.
     // Generates 64 random bytes every time count is incremented.
-
     uint32_t state[16];
-
     static uint32_t rotl32(uint32_t x, int n) {
         return (x << n) | (x >> (32 - n));
     }
-
     static uint32_t pack4(const uint8_t *a) {
         return uint32_t(a[0] << 0 * 8) |
                uint32_t(a[1] << 1 * 8) |
                uint32_t(a[2] << 2 * 8) |
                uint32_t(a[3] << 3 * 8);
     }
-
     static void unpack4(uint32_t src, uint8_t *dst) {
         dst[0] = (src >> 0 * 8) & 0xff;
         dst[1] = (src >> 1 * 8) & 0xff;
         dst[2] = (src >> 2 * 8) & 0xff;
         dst[3] = (src >> 3 * 8) & 0xff;
     }
-
     Chacha20Block(const uint8_t key[32], const uint8_t nonce[8]) {
         const uint8_t *magic_constant = (uint8_t *)"expand 32-byte k";
         state[0] = pack4(magic_constant + 0 * 4);
@@ -97,14 +92,12 @@ struct Chacha20Block {
         state[14] = pack4(nonce + 0 * 4);
         state[15] = pack4(nonce + 1 * 4);
     }
-
     void set_counter(uint64_t counter) {
         // Want to process many blocks in parallel?
         // No problem! Just set the counter to the block you want to process.
         state[12] = uint32_t(counter);
         state[13] = counter >> 32;
     }
-
     void next(uint32_t result[16]) {
         // This is where the crazy voodoo magic happens.
         // Mix the bytes a lot and hope that nobody finds out how to undo it.
@@ -120,7 +113,6 @@ struct Chacha20Block {
     x[d] = rotl32(x[d] ^ x[a], 8);           \
     x[c] += x[d];                            \
     x[b] = rotl32(x[b] ^ x[c], 7);
-
         for (int i = 0; i < 10; i++) {
             CHACHA20_QUARTERROUND(result, 0, 4, 8, 12)
             CHACHA20_QUARTERROUND(result, 1, 5, 9, 13)
@@ -131,10 +123,8 @@ struct Chacha20Block {
             CHACHA20_QUARTERROUND(result, 2, 7, 8, 13)
             CHACHA20_QUARTERROUND(result, 3, 4, 9, 14)
         }
-
         for (int i = 0; i < 16; i++)
             result[i] += state[i];
-
         uint32_t *counter = state + 12;
         // increment counter
         counter[0]++;
@@ -152,9 +142,7 @@ struct Chacha20Block {
 
     void next(uint8_t result8[64]) {
         uint32_t temp32[16];
-
         next(temp32);
-
         for (size_t i = 0; i < 16; i++)
             unpack4(temp32[i], result8 + i * 4);
     }
@@ -166,19 +154,18 @@ struct Chacha20 {
     // Chacha20Blocks can be skipped, so this can be done in parallel.
     // If keys are reused, messages can be decrypted.
     // Known encrypted text with known position can be tampered with.
-    // See https://en.wikipedia.org/wiki/Stream_cipher_attack
-
+    // See https://en.wikipedia.org/wiki/Stream_cipher_action
+private:
     Chacha20Block block;
     uint8_t keystream8[64];
     size_t position;
-
+public:
     Chacha20(
         const uint8_t key[32],
         const uint8_t nonce[8],
         uint64_t counter = 0) : block(key, nonce), position(64) {
         block.set_counter(counter);
     }
-
     void crypt(uint8_t *bytes, size_t n_bytes) {
         for (size_t i = 0; i < n_bytes; i++) {
             if (position >= 64) {
