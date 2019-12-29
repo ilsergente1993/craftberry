@@ -132,7 +132,7 @@ void help() {
             "       TCPMULTIPY : multiply N times every tcp packet to dst\n"
             "       UDPMULTIPY : multiply N times every udp packet to dst\n"
             "   - DEFENSE:\n"
-            "       CHACHA20   : description\n";
+            "       CHACHA20   : encrypt all the outgoing traffic and decrypt all the ingoing traffic\n";
     exit(0);
 }
 

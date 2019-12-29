@@ -7,24 +7,25 @@ craftberry -A interface_src -B interface_dst { -a ATTACKNAME | -d DEFENSENAME }
 
 #### Details:
 ```
-    -A interface src  : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address
-    -B interface dst  : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address
-    -a                : Use the specified action
-    -d                : Use the specified defence
-    -t                : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)
-    -l                : Print the list of interfaces and exists
-    -h                : Displays this help message and exits
+Options:
+    -A            : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address
+    -B            : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address
+    -a            : Use the specified action
+    -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)
+    -l            : Print the list of interfaces and exists
+    -h            : Displays this help message and exits
 
-ATTACKNAME:
-    BEQUITE        : just replying all the traffic from source to destination
-    DNS            : catch the DNS queries and replace its value
-    HTTP           : description
-    HTTPIMAGE      : description
-    TCPMULTIPY     : multiply N times every tcp packet to dst
-    UDPMULTIPY     : multiply N times every udp packet to dst
-
-DEFENSENAME:
-    CHACHA20       : description
+Actions:
+   - default:
+       BEQUITE    : just replying all the traffic from src to dst
+   - ATTACK:
+       DNS        : catch the DNS queries and replace its value
+       HTTP       : description
+       HTTPIMAGE  : description
+       TCPMULTIPY : multiply N times every tcp packet to dst
+       UDPMULTIPY : multiply N times every udp packet to dst
+   - DEFENSE:
+       CHACHA20   : encrypt all the outgoing traffic and decrypt all the ingoing traffic
 ```
 
 #### How to compile
