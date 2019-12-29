@@ -3,8 +3,10 @@
 #### How to use
 ```
 craftberry -A interface_src -B interface_dst { -a ATTACKNAME | -d DEFENSENAME }
+```
 
-DETAILS:
+#### Details:
+```
     -A interface src  : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address
     -B interface dst  : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address
     -a                : Use the specified attack
@@ -26,8 +28,18 @@ DEFENSENAME:
 ```
 
 #### How to compile
-```make;```
+```bash
+make;
+```
 
 
 #### How to send fake traffic for testing
-```sudo tcpreplay -i <interface> --loop=10 --loopdelay-ms=1000 <pcap_file>```
+```bash
+sudo tcpreplay -i <interface> --loop=10 --loopdelay-ms=1000 <pcap_file>
+```
+
+
+#### Roadmap
+- [X] **PoC attacks** (work in progress)
+- [ ] PoC prevention systems
+- [ ] Reputation systems integration
