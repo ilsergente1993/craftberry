@@ -16,6 +16,7 @@
 
 #include "ChaCha20Worker.cpp"
 #include "DnsRobber.cpp"
+#include "IcmpMultiply.cpp"
 #include "TcpMultiply.cpp"
 #include "UdpMultiply.cpp"
 
@@ -138,8 +139,18 @@ public:
             return;
         }
 
+        if (d->method.compare("TCPMULTIPLY") == 0) {
+            TcpMultiply action(3);
+            pToSend = action.craft(inPacket);
+            if (pToSend->size() > 0) {
+                DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
+                d->sendPackets(pToSend);
+                return;
+            }
+        }
+
         if (d->method.compare("UDPMULTIPLY") == 0) {
-            UdpMultiply action;
+            UdpMultiply action(3);
             pToSend = action.craft(inPacket);
             if (pToSend->size() > 0) {
                 DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
@@ -149,11 +160,12 @@ public:
             }
         }
 
-        if (d->method.compare("TCPMULTIPLY") == 0) {
-            TcpMultiply action;
+        if (d->method.compare("ICMPMULTIPLY") == 0) {
+            IcmpMultiply action(2);
             pToSend = action.craft(inPacket);
             if (pToSend->size() > 0) {
                 DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
+                //cout << pToSend->size() << endl;
                 d->sendPackets(pToSend);
                 return;
             }

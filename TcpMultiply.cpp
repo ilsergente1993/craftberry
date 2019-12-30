@@ -23,7 +23,7 @@ public:
     static const int level = 4;
     int n;
 
-    TcpMultiply() : n(0){};
+    TcpMultiply(int _n) : n(_n){};
     ~TcpMultiply(){};
     vector<RawPacket *> *craft(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);

@@ -17,18 +17,18 @@
 using namespace std;
 using namespace pcpp;
 
-class UdpMultiply : public Action {
+class IcmpMultiply : public Action {
 
 public:
-    static const int level = 4;
+    static const int level = 4; //TODO: ??
     int n;
 
-    UdpMultiply(int _n) : n(_n){};
-    ~UdpMultiply(){};
+    IcmpMultiply(int _n) : n(_n){};
+    ~IcmpMultiply(){};
     vector<RawPacket *> *craft(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);
         vector<RawPacket *> *pp = new vector<RawPacket *>();
-        if (parsedPacket.isPacketOfType(ProtocolType::UDP)) {
+        if (parsedPacket.isPacketOfType(ProtocolType::ICMP)) {
             for (int i = 0; i < this->n; i++) {
                 pp->push_back(inPacket);
             }
