@@ -1,9 +1,5 @@
 #pragma once
 
-#include "Action.cpp"
-#include "arpa/inet.h"
-#include "getopt.h"
-#include "iostream"
 #include "pcapplusplus/EthLayer.h"
 #include "pcapplusplus/HttpLayer.h"
 #include "pcapplusplus/IPv4Layer.h"
@@ -12,8 +8,13 @@
 #include "pcapplusplus/PcapLiveDeviceList.h"
 #include "pcapplusplus/PlatformSpecificUtils.h"
 #include "pcapplusplus/TcpLayer.h"
-#include "stdlib.h"
+#include <arpa/inet.h>
+#include <ctime>
+#include <getopt.h>
+#include <iostream>
+#include <stdlib.h>
 
+#include "Action.cpp"
 #include "ChaCha20Worker.cpp"
 #include "DnsRobber.cpp"
 #include "IcmpMultiply.cpp"
@@ -35,20 +36,27 @@ public:
     string intDst;
     pcpp::PcapLiveDevice *devSrc;
     pcpp::PcapLiveDevice *devDst;
+    pcpp::PcapNgFileWriterDevice *devDstFile;
     void *data;
 
-    Details(string _method, string _interfaceSrc, string _interfaceDst) : data(0) {
+    Details(string _method, string _interfaceSrc, string _interfaceDst, string _devDstFilename) : data(0) {
         method = _method;
         devSrc = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp((intSrc = _interfaceSrc).c_str());
         devDst = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp((intDst = _interfaceDst).c_str());
-        //DOC: ottengo il device
+        devDstFile = new PcapNgFileWriterDevice(_devDstFilename.c_str());
+        //DOC: getting the device
         if (devSrc == NULL || devDst == NULL) {
             cout << "Cannot find interface with IPv4 address of '" << intSrc << "' or '" << intDst << "'\n";
             exit(1);
         }
-        //DOC: apro il device
+        //DOC: opening the device
         if (!devSrc->open() || !devDst->open()) {
             cout << "Cannot open the devices" << endl;
+            exit(1);
+        }
+        //DOC: opening the out file stream
+        if (!devDstFile->open()) {
+            printf("Cannot open the out file stream for writing\n");
             exit(1);
         }
     };
@@ -58,6 +66,7 @@ public:
         }
         devSrc->stopCapture();
         devDst->stopCapture();
+        devDstFile->close();
         //devSrc->close();
         // devDst->close();
         //free(devSrc);
@@ -66,6 +75,7 @@ public:
         //delete devSrc;
         // delete devDst;
         // delete data;
+        //delete devDstFile;
         cout << "All is clean" << endl;
     }
 
@@ -117,6 +127,7 @@ public:
             } else {
                 cont++;
                 size += p->getRawDataLen();
+                devDstFile->writePacket(*p);
             }
             totalByteSent += size;
             totalPacketsSent += cont;
