@@ -1,12 +1,16 @@
-### Compilation, Execution and Testing
+# Craftberry
 
-#### How to use
-```
+## Compilation, Execution and Testing
+
+### How to use
+
+```bash
 craftberry -A interface_src -B interface_dst { -a ATTACKNAME | -d DEFENSENAME }
 ```
 
-#### Details:
-```
+### Details
+
+```bash
  -A interface_src -B interface_dst -a [ ATTACK | DEFENSE ]
 
 Options:
@@ -32,22 +36,26 @@ Actions:
        CHACHA20   : encrypt all the outgoing traffic and decrypt all the ingoing traffic
 ```
 
-#### How to compile
+### How to compile
+
 ```bash
 make;
 ```
 
+### How to send fake traffic for testing
 
-#### How to send fake traffic for testing
-##### setup
-Create two interfaces (if they don't exist) and get the two ip addresses. 
+#### setup
+
+Create two interfaces (if they don't exist) and get the two ip addresses.
+
 ##### send traffic
+
 ```bash
 sudo tcpreplay -i <interface> --loop=10 --loopdelay-ms=1000 <pcap_file>
 ```
 
+### Roadmap
 
-#### Roadmap
 - [X] **PoC actions** (work in progress)
 - [ ] PoC prevention systems
 - [ ] Reputation systems integration
