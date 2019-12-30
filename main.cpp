@@ -22,6 +22,7 @@
 using namespace std;
 using namespace pcpp;
 
+//DOC: struct to storage the usage options for the CLI
 static struct option CraftberryOptions[] =
     {{"interfac_src", required_argument, 0, 'A'},
      {"interface_dst", required_argument, 0, 'B'},
@@ -31,16 +32,17 @@ static struct option CraftberryOptions[] =
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
 
+void ctrlc(int);
 void help();
-//static void callback(RawPacket *, PcapLiveDevice *, void *);
 void listInterfaces();
 struct Details *gd;
 
+//DOC: handler function to manage external signals
 void ctrlc(int s) {
-    printf("\nOoooops got ctrl+c signal (%d)\nHere a summary of what happened:", s);
+    cerr << "\nOoooops got ctrl+c signal (" << s << ")\nHere a summary of what happened:";
     gd->summary();
     delete gd;
-    cout << "bye bye" << endl;
+    cout << "bye bye\n";
     exit(1);
 }
 
@@ -53,10 +55,10 @@ int main(int argc, char *argv[]) {
     sigaction(SIGINT, &sigIntHandler, NULL);
 
     string interfaceSrc = "", interfaceDst = "";
-    string action = "";
+    string action = "BEQUITE";
     int optionIndex = 0, timeout = 0;
     char opt = 0;
-    //':' significa che si aspetta degli argomenti
+    //':' => significa che si aspetta degli argomenti
     while ((opt = getopt_long(argc, argv, "A:B:a:t:lh", CraftberryOptions, &optionIndex)) != -1) {
         switch (opt) {
         case 0:
@@ -114,7 +116,7 @@ int main(int argc, char *argv[]) {
 void help() {
     cout << "\nUsage: Craftberry options:\n"
             "-------------------------\n"
-            " -A interface_src -B interface_dst -a { ATTACK | DEFENSE }\n"
+            " -A interface_src -B interface_dst -a [ ATTACK | DEFENSE ]\n"
             "\nOptions:\n"
             "    -A            : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
             "    -B            : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"

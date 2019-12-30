@@ -14,10 +14,10 @@
 #include "pcapplusplus/TcpLayer.h"
 #include "stdlib.h"
 
+#include "ChaCha20Worker.cpp"
 #include "DnsRobber.cpp"
 #include "TcpMultiply.cpp"
 #include "UdpMultiply.cpp"
-#include "ChaCha20Worker.cpp"
 
 using namespace std;
 using namespace pcpp;
@@ -76,7 +76,7 @@ public:
             cout << "DevSrc or DevDst not opened" << endl;
             return;
         }
-        cout << "Interface Src info:\n";
+        cout << "Interface Src info:" << endl;
         cout << "\tIP:                    " << devSrc->getIPv4Address().toString() << endl;
         cout << "\tInterface name:        " << devSrc->getName() << endl;
         cout << "\tInterface description: " << devSrc->getDesc() << endl;
@@ -88,7 +88,7 @@ public:
         else
             cout << "\tDNS Servers:           0" << endl;
 
-        cout << "Interface Dst info:\n";
+        cout << "Interface Dst info:" << endl;
         cout << "\tIP:                    " << devDst->getIPv4Address().toString() << endl;
         cout << "\tInterface name:        " << devDst->getName() << endl;
         cout << "\tInterface description: " << devDst->getDesc() << endl;
