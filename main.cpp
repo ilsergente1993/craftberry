@@ -30,7 +30,7 @@ static struct option CraftberryOptions[] =
      {"action", required_argument, 0, 'a'},
      {"timeout", required_argument, 0, 't'},
      {"log", required_argument, 0, 'l'},
-     {"direction", required_argument, 0, 'l'},
+     {"direction", required_argument, 0, 'd'},
      {"list-interfaces", no_argument, 0, 'i'},
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
@@ -65,6 +65,7 @@ int main(int argc, char *argv[]) {
     char opt = 0;
     //':' => significa che si aspetta degli argomenti
     while ((opt = getopt_long(argc, argv, CraftberryOptionsShort, CraftberryOptions, &optionIndex)) != -1) {
+        //cout << opt << " ---> " << optarg << endl;
         switch (opt) {
         case 0:
             break;
@@ -81,11 +82,11 @@ int main(int argc, char *argv[]) {
             timeout = atoi(optarg);
             break;
         case 'l':
-            cout << optarg << endl;
             if (strcmp(optarg, "default") != 0)
                 (logName = optarg) += ".pcapng";
             break;
         case 'd':
+            cout << " ---> " << optarg[0] << endl;
             switch (optarg[0]) {
             case '>':
                 direction = RightToLeft;
@@ -100,6 +101,7 @@ int main(int argc, char *argv[]) {
                 cout << "The value of the direction parameter is invalid";
                 exit(1);
             }
+            cout << direction << endl;
             break;
         case 'i':
             listInterfaces();

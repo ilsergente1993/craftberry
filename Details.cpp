@@ -206,6 +206,10 @@ public:
 
 private:
     bool hasRightDirection(PcapLiveDevice *devFromPacketComes) {
+        // cout << (direction == Both ||
+        //          (direction == LeftToRight && devFromPacketComes == devSrc) ||
+        //          (direction == RightToLeft && devFromPacketComes == devDst))
+        //      << endl;
         return direction == Both ||
                (direction == LeftToRight && devFromPacketComes == devSrc) ||
                (direction == RightToLeft && devFromPacketComes == devDst);
