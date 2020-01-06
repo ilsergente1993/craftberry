@@ -86,22 +86,18 @@ int main(int argc, char *argv[]) {
                 (logName = optarg) += ".pcapng";
             break;
         case 'd':
-            cout << " ---> " << optarg[0] << endl;
+            //NOTE: usare gli apici singoli per '<' e '>'
             switch (optarg[0]) {
             case '>':
-                direction = RightToLeft;
-                break;
-            case '<':
                 direction = LeftToRight;
                 break;
-            case '=':
-                direction = Both;
+            case '<':
+                direction = RightToLeft;
                 break;
+            case '=':
             default:
-                cout << "The value of the direction parameter is invalid";
-                exit(1);
+                direction = Both;
             }
-            cout << direction << endl;
             break;
         case 'i':
             listInterfaces();

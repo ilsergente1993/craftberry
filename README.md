@@ -46,9 +46,11 @@ make;
 
 #### setup
 
-Create two interfaces (if they don't exist) and get the two ip addresses.
+Create two interfaces (if they don't exist) and get the two ip addresses.  
+Run ```setup.sh``` as sudo.
 
-##### send traffic
+
+##### send traffic in linux
 
 ```bash
 sudo tcpreplay -i <interface> --loop=10 --loopdelay-ms=1000 <pcap_file>
