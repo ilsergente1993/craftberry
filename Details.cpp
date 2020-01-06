@@ -24,6 +24,10 @@
 using namespace std;
 using namespace pcpp;
 
+enum PacketDirection { Both,
+                       LeftToRight,
+                       RightToLeft };
+
 struct Details {
 public:
     double totalByteReceived{0};
@@ -34,16 +38,18 @@ public:
     string method;
     string intSrc;
     string intDst;
-    pcpp::PcapLiveDevice *devSrc;
-    pcpp::PcapLiveDevice *devDst;
-    pcpp::PcapNgFileWriterDevice *devDstFile;
+    PcapLiveDevice *devSrc;
+    PcapLiveDevice *devDst;
+    PcapNgFileWriterDevice *devDstFile;
+    PacketDirection direction;
     void *data;
 
-    Details(string _method, string _interfaceSrc, string _interfaceDst, string _devDstFilename) : data(0) {
+    Details(string _method, string _interfaceSrc, string _interfaceDst, string _devDstFilename, PacketDirection _direction) : data(0) {
         method = _method;
         devSrc = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp((intSrc = _interfaceSrc).c_str());
         devDst = PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp((intDst = _interfaceDst).c_str());
         devDstFile = new PcapNgFileWriterDevice(_devDstFilename.c_str());
+        direction = _direction;
         //DOC: getting the device
         if (devSrc == NULL || devDst == NULL) {
             cout << "Cannot find interface with IPv4 address of '" << intSrc << "' or '" << intDst << "'\n";
@@ -135,7 +141,7 @@ public:
         DEBUG("-> " << cont << " packets (" << size << " B) to " << devDst->getIPv4Address().toString() << endl);
     }
 
-    static void callback(RawPacket *inPacket, PcapLiveDevice *devSrc, void *details) {
+    static void callback(RawPacket *inPacket, PcapLiveDevice *localDevSrc, void *details) {
         //DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
         vector<RawPacket *> *pToSend;
         Details *d = (Details *)details;
@@ -143,7 +149,7 @@ public:
         d->totalPacketsReceived++;
 
         if (d->method.compare("BEQUITE") == 0) {
-            DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
+            DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
             pToSend = new vector<RawPacket *>();
             pToSend->push_back(inPacket);
             d->sendPackets(pToSend);
@@ -151,10 +157,12 @@ public:
         }
 
         if (d->method.compare("TCPMULTIPLY") == 0) {
+            if (!d->hasRightDirection(localDevSrc))
+                return;
             TcpMultiply action(3);
             pToSend = action.craft(inPacket);
             if (pToSend->size() > 0) {
-                DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
+                DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
                 d->sendPackets(pToSend);
                 return;
             }
@@ -164,7 +172,7 @@ public:
             UdpMultiply action(3);
             pToSend = action.craft(inPacket);
             if (pToSend->size() > 0) {
-                DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
+                DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
                 cout << pToSend->size() << endl;
                 d->sendPackets(pToSend);
                 return;
@@ -172,10 +180,12 @@ public:
         }
 
         if (d->method.compare("ICMPMULTIPLY") == 0) {
+            if (!d->hasRightDirection(localDevSrc))
+                return;
             IcmpMultiply action(2);
             pToSend = action.craft(inPacket);
             if (pToSend->size() > 0) {
-                DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
+                DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
                 //cout << pToSend->size() << endl;
                 d->sendPackets(pToSend);
                 return;
@@ -183,7 +193,7 @@ public:
         }
 
         if (d->method.compare("CHACHA20") == 0) {
-            DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
+            DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
 
             ChaCha20Worker action;
             pToSend = action.craft(inPacket);
@@ -192,5 +202,12 @@ public:
                 return;
             }
         }
+    }
+
+private:
+    bool hasRightDirection(PcapLiveDevice *devFromPacketComes) {
+        return direction == Both ||
+               (direction == LeftToRight && devFromPacketComes == devSrc) ||
+               (direction == RightToLeft && devFromPacketComes == devDst);
     }
 };

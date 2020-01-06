@@ -23,13 +23,14 @@ using namespace std;
 using namespace pcpp;
 
 //DOC: struct storaging the usage options for the CLI
-const char *const CraftberryOptionsShort = "A:B:a:t:l:ih";
+const char *const CraftberryOptionsShort = "A:B:a:t:l:d:ih";
 static struct option CraftberryOptions[] =
     {{"interfac_src", required_argument, 0, 'A'},
      {"interface_dst", required_argument, 0, 'B'},
      {"action", required_argument, 0, 'a'},
      {"timeout", required_argument, 0, 't'},
      {"log", required_argument, 0, 'l'},
+     {"direction", required_argument, 0, 'l'},
      {"list-interfaces", no_argument, 0, 'i'},
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
@@ -59,6 +60,7 @@ int main(int argc, char *argv[]) {
     string interfaceSrc = "", interfaceDst = "";
     string action = "BEQUITE";
     string logName = "captures/out_" + to_string(time(0)) + ".pcapng";
+    PacketDirection direction = Both;
     int optionIndex = 0, timeout = 0;
     char opt = 0;
     //':' => significa che si aspetta degli argomenti
@@ -83,6 +85,22 @@ int main(int argc, char *argv[]) {
             if (strcmp(optarg, "default") != 0)
                 (logName = optarg) += ".pcapng";
             break;
+        case 'd':
+            switch (optarg[0]) {
+            case '>':
+                direction = RightToLeft;
+                break;
+            case '<':
+                direction = LeftToRight;
+                break;
+            case '=':
+                direction = Both;
+                break;
+            default:
+                cout << "The value of the direction parameter is invalid";
+                exit(1);
+            }
+            break;
         case 'i':
             listInterfaces();
             exit(-1);
@@ -97,7 +115,7 @@ int main(int argc, char *argv[]) {
         cout << "Dude, let's do some action!" << endl;
         exit(1);
     }
-    gd = new Details{action, interfaceSrc, interfaceDst, logName};
+    gd = new Details{action, interfaceSrc, interfaceDst, logName, direction};
     gd->toString();
 
     //DOC: start packet capturing
@@ -105,7 +123,7 @@ int main(int argc, char *argv[]) {
     if (timeout == 0) {
         cout << "Working in infinite mode, press ctrl+c to exit..." << endl;
         while (1) {
-            //DOC: I quit when someone press ctrl+c
+            //DOC: I quit only when ctrl+c is pressed
         };
     } else {
         while (--timeout >= 0) {
@@ -124,16 +142,17 @@ int main(int argc, char *argv[]) {
 void help() {
     cout << "\nUsage: Craftberry options:\n"
             "-------------------------\n"
-            " -A interface_src -B interface_dst -a [ ATTACK | DEFENSE ]\n"
-            "\nOptions:\n"
+            " -A interface_src -B interface_dst\n"
+            "Options:\n"
             "    -A            : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
             "    -B            : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
             "    -a            : Use the specified action\n"
             "    -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)\n"
             "    -l            : Write the output stream sent to the destination interface into a pcapng file having name passed by parameter or, if the parameter's equal to 'default', the name is 'out_<epoch_ms>'\n"
             "    -i            : Print the list of interfaces and exists\n"
+            "    -d            : Set the flow direction where to perform the action. Both direction is the default value.\n"
             "    -h            : Displays this help message and exits\n"
-            "\nActions:\n"
+            "Actions:\n"
             "   - default:\n"
             "       BEQUITE    : just replying all the traffic from src to dst\n"
             "   - ATTACK:\n"
