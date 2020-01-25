@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "this setup is for WSL2 on Win10"\
+echo "this setup is for WSL2 on Win10\n"\
      "it setups the dummy0 interface with a custom ip address, brings it up and gets the eth0 ip"\
      "the two ip addresses can be used as Source and Destination for Craftberry"
 

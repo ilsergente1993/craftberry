@@ -32,9 +32,10 @@ public:
         //NOTE: non riesco a prendere l'immagine perchè è suddivisa su più frame e devo prima ricostruire i pacchetti tcp
         //vedi: https://github.com/seladb/PcapPlusPlus/blob/master/Examples/TcpReassembly/main.cpp
         HttpResponseLayer *response = parsedPacket.getLayerOfType<HttpResponseLayer>();
+        //response->http205ResetContent
         if (response == NULL)
             return nullptr;
-        if (response->getFirstLine()->getStatusCodeAsInt() == 200) {
+        if (response->getFirstLine()->getStatusCode() == HttpResponseLayer::Http200OK) {
             ofstream image;
             image.open("passport.jpg", ios::binary);
             cout << "got 200 HTTP packet: " << response->getFirstLine()->getStatusCodeString() << endl;

@@ -38,9 +38,10 @@ Actions:
 
 ### How to compile
 
-```bash
-make;
-```
+The application requires the pcapplusplus libs installed on the target system.
+You can find the installation procedure [here](https://pcapplusplus.github.io/docs/install).
+
+Use ```make``` to compile and produce the exec file.
 
 ### How to send fake traffic for testing
 
