@@ -161,7 +161,7 @@ public:
 
         if (d->method.compare("BEQUITE") == 0) {
             //DOC: just forwarding everything
-            DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
+            //DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
             d->sendPacket(inPacket);
             return;
         }
