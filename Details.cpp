@@ -30,10 +30,12 @@ enum PacketDirection { Both,
 
 struct Details {
 public:
-    double totalByteReceived{0};
+    double totalBytesReceived{0};
     double totalPacketsReceived{0};
-    double totalByteSent{0};
+    double totalBytesSent{0};
     double totalPacketsSent{0};
+    double totalBytesDropped{0};
+    double totalPacketsDropped{0};
 
     string method;
     string intSrc;
@@ -119,20 +121,27 @@ public:
     }
     void summary() {
         cerr << endl
-             << "   Packets received:      " << totalPacketsReceived << " (" << totalByteReceived << " bytes)" << endl
-             << "   Packets sent:          " << totalPacketsSent << " (" << totalByteSent << " bytes)" << endl;
+             << "   Packets received:      " << totalPacketsReceived << " (" << totalBytesReceived << " bytes)" << endl
+             << "   Packets sent:          " << totalPacketsSent << " (" << totalBytesSent << " bytes)" << endl
+             << "   Packets dropped:       " << totalPacketsDropped << " (" << totalBytesDropped << " bytes)" << endl;
     };
 
     bool sendPacket(RawPacket *p) {
-        if (!devDst->sendPacket(*p))
+        if (p->getRawDataLen() > devDst->getMtu()) {
+            totalPacketsDropped++;
+            totalBytesDropped += p->getRawDataLen();
             return false;
-        devDstFile->writePacket(*p);
-        return true;
+        }
+        if (devDst->sendPacket(*p)) {
+            devDstFile->writePacket(*p);
+            return true;
+        }
+        return false;
     };
-    void sendPacket(vector<RawPacket *> *pToSend) {
-        sendPacket(pToSend, false);
+    void sendPackets(vector<RawPacket *> *pToSend) {
+        sendPackets(pToSend, false);
     };
-    void sendPacket(vector<RawPacket *> *pToSend, bool hidden) {
+    void sendPackets(vector<RawPacket *> *pToSend, bool hidden) {
         int cont = 0;
         double size = 0;
         for (auto p : *pToSend) {
@@ -145,7 +154,7 @@ public:
                 size += p->getRawDataLen();
                 sendPacket(p);
             }
-            totalByteSent += size;
+            totalBytesSent += p->getRawDataLen();
             totalPacketsSent += cont;
         }
         if (!hidden)
@@ -156,7 +165,7 @@ public:
         //DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << devSrc->getIPv4Address().toString() << endl);
         vector<RawPacket *> *pToSend;
         Details *d = (Details *)details;
-        d->totalByteReceived += inPacket->getRawDataLen();
+        d->totalBytesReceived += inPacket->getRawDataLen();
         d->totalPacketsReceived++;
 
         if (d->method.compare("BEQUITE") == 0) {
@@ -173,7 +182,7 @@ public:
             pToSend = action.craft(inPacket);
             if (pToSend->size() > 0) {
                 DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
-                d->sendPacket(pToSend);
+                d->sendPackets(pToSend);
             }
             return;
         }
@@ -184,7 +193,7 @@ public:
             if (pToSend->size() > 0) {
                 DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
                 cout << pToSend->size() << endl;
-                d->sendPacket(pToSend);
+                d->sendPackets(pToSend);
             }
             return;
         }
@@ -196,7 +205,7 @@ public:
                 if (pToSend->size() > 0) {
                     DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
                     //cout << pToSend->size() << endl;
-                    d->sendPacket(pToSend);
+                    d->sendPackets(pToSend);
                 }
             } else {
                 d->sendPacket(inPacket);
@@ -210,7 +219,7 @@ public:
             ChaCha20Worker action;
             pToSend = action.craft(inPacket);
             if (pToSend->size() > 0) {
-                d->sendPacket(pToSend);
+                d->sendPackets(pToSend);
             }
             return;
         }
