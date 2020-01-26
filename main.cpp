@@ -86,19 +86,12 @@ int main(int argc, char *argv[]) {
                 (logName = optarg) += ".pcapng";
             break;
         case 'd':
-            //NOTE: usare gli apici singoli per '<' e '>'
-            switch (optarg[0]) {
-            case '>':
-                direction = LeftToRight;
-                break;
-            case '<':
-                direction = RightToLeft;
-                break;
-            case '=':
-            default:
+            if (strcmp(&optarg[0], "in") == 0)
+                direction = InGoing;
+            else if (strcmp(&optarg[0], "out") == 0)
+                direction = OutGoing;
+            else
                 direction = Both;
-            }
-            break;
         case 'i':
             listInterfaces();
             exit(-1);

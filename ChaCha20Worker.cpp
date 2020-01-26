@@ -30,7 +30,7 @@ public:
     ChaCha20Worker() : n(0){};
     ~ChaCha20Worker(){};
 
-    vector<RawPacket *> *craft(RawPacket *inPacket) {
+    vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);
         vector<RawPacket *> *pp = new vector<RawPacket *>();
         if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
@@ -86,6 +86,11 @@ public:
             pp->push_back(outPacket.getRawPacket());
             this->shots++;
         }
+        return pp;
+    }
+    vector<RawPacket *> *craftOutGoing(RawPacket *inPacket) {
+        Packet parsedPacket(inPacket);
+        vector<RawPacket *> *pp = new vector<RawPacket *>();
         return pp;
     }
 };

@@ -21,15 +21,26 @@ class IcmpMultiply : public Action {
 
 public:
     static const int level = 4; //TODO: ??
-    int n;
+    int nIn, nOut;
 
-    IcmpMultiply(int _n) : n(_n){};
+    IcmpMultiply(int _nIn, int _nOut) : nIn(_nIn), nOut(_nOut){};
     ~IcmpMultiply(){};
-    vector<RawPacket *> *craft(RawPacket *inPacket) {
+    vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);
         vector<RawPacket *> *pp = new vector<RawPacket *>();
         if (parsedPacket.isPacketOfType(ProtocolType::ICMP)) {
-            for (int i = 0; i < this->n; i++) {
+            for (int i = 0; i < this->nIn; i++) {
+                pp->push_back(inPacket);
+            }
+            this->shots++;
+        }
+        return pp;
+    }
+    vector<RawPacket *> *craftOutGoing(RawPacket *inPacket) {
+        Packet parsedPacket(inPacket);
+        vector<RawPacket *> *pp = new vector<RawPacket *>();
+        if (parsedPacket.isPacketOfType(ProtocolType::ICMP)) {
+            for (int i = 0; i < this->nOut; i++) {
                 pp->push_back(inPacket);
             }
             this->shots++;

@@ -25,7 +25,18 @@ public:
 
     UdpMultiply(int _n) : n(_n){};
     ~UdpMultiply(){};
-    vector<RawPacket *> *craft(RawPacket *inPacket) {
+    vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
+        Packet parsedPacket(inPacket);
+        vector<RawPacket *> *pp = new vector<RawPacket *>();
+        if (parsedPacket.isPacketOfType(ProtocolType::UDP)) {
+            for (int i = 0; i < this->n; i++) {
+                pp->push_back(inPacket);
+            }
+            this->shots++;
+        }
+        return pp;
+    }
+    vector<RawPacket *> *craftOutGoing(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);
         vector<RawPacket *> *pp = new vector<RawPacket *>();
         if (parsedPacket.isPacketOfType(ProtocolType::UDP)) {

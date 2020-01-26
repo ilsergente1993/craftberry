@@ -19,6 +19,7 @@ Options:
     -a            : Use the specified action
     -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)
     -l            : Write the output stream sent to the destination interface into a pcapng file having name passed by parameter or, if the parameter's equal to 'default', the name is 'out_<epoch_ms>'
+    -d            : Direction filtering by and perform the crafting {in, out, inout}, default = inout
     -i            : Print the list of interfaces and exists
     -h            : Displays this help message and exits
 

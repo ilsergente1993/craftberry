@@ -25,8 +25,8 @@ using namespace std;
 using namespace pcpp;
 
 enum PacketDirection { Both,
-                       LeftToRight,
-                       RightToLeft };
+                       InGoing,
+                       OutGoing };
 
 struct Details {
 public:
@@ -90,7 +90,9 @@ public:
     void toString() {
         cout << "0---------------------------------------------------------0" << endl;
         cout << "\tMethod:                " << method << endl;
-        cout << "\tAddress Data:          " << data << endl;
+        cout << "\tLogfile:               " << devDstFile->getFileName() << endl;
+        cout << "\tDirection:             " << (direction == Both ? "in&out" : (direction == InGoing ? "in" : "out")) << endl;
+        //cout << "\tAddress Data:          " << data << endl;
         if (!devSrc->open() || !devDst->open()) {
             cout << "DevSrc or DevDst not opened" << endl;
             return;
@@ -124,6 +126,10 @@ public:
              << "   Packets received:      " << totalPacketsReceived << " (" << totalBytesReceived << " bytes)" << endl
              << "   Packets sent:          " << totalPacketsSent << " (" << totalBytesSent << " bytes)" << endl
              << "   Packets dropped:       " << totalPacketsDropped << " (" << totalBytesDropped << " bytes)" << endl;
+        pcap_stat stats;
+        devDstFile->getStatistics(stats);
+        cerr << "in file: received:" << stats.ps_recv << ", "
+             << "dropped:" << stats.ps_drop << endl;
     };
 
     bool sendPacket(RawPacket *p) {
@@ -134,6 +140,7 @@ public:
         }
         if (devDst->sendPacket(*p)) {
             devDstFile->writePacket(*p);
+            //cout << "scritto" << endl;
             return true;
         }
         return false;
@@ -170,16 +177,18 @@ public:
 
         if (d->method.compare("BEQUITE") == 0) {
             //DOC: just forwarding everything
-            //DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
-            d->sendPacket(inPacket);
+            DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
+            vector<RawPacket *> *pp = new vector<RawPacket *>();
+            pp->push_back(inPacket);
+            d->sendPackets(pp);
             return;
         }
 
         if (d->method.compare("TCPMULTIPLY") == 0) {
-            if (!d->hasCorrectDirection(localDevSrc))
+            if (!d->isCraftingOutGoing(localDevSrc))
                 return;
             TcpMultiply action(3);
-            pToSend = action.craft(inPacket);
+            pToSend = action.craftOutGoing(inPacket);
             if (pToSend->size() > 0) {
                 DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
                 d->sendPackets(pToSend);
@@ -189,7 +198,7 @@ public:
 
         if (d->method.compare("UDPMULTIPLY") == 0) {
             UdpMultiply action(3);
-            pToSend = action.craft(inPacket);
+            pToSend = action.craftOutGoing(inPacket);
             if (pToSend->size() > 0) {
                 DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
                 cout << pToSend->size() << endl;
@@ -198,28 +207,34 @@ public:
             return;
         }
 
-        if (d->method.compare("ICMPMULTIPLY") == 0) {
-            if (d->hasCorrectDirection(localDevSrc)) {
-                IcmpMultiply action(2);
-                pToSend = action.craft(inPacket);
-                if (pToSend->size() > 0) {
-                    DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
-                    //cout << pToSend->size() << endl;
-                    d->sendPackets(pToSend);
-                }
-            } else {
-                d->sendPacket(inPacket);
-            }
-            return;
-        }
-
         if (d->method.compare("CHACHA20") == 0) {
             DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
 
             ChaCha20Worker action;
-            pToSend = action.craft(inPacket);
+            pToSend = action.craftOutGoing(inPacket);
             if (pToSend->size() > 0) {
                 d->sendPackets(pToSend);
+            }
+            return;
+        }
+
+        if (d->method.compare("ICMPMULTIPLY") == 0) {
+            IcmpMultiply action(2, 3);
+            if (d->isCraftingInGoing(localDevSrc)) {
+                pToSend = action.craftInGoing(inPacket);
+                if (pToSend->size() > 0) {
+                    DEBUG("-> 1 in packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
+                    //cout << pToSend->size() << endl;
+                    d->sendPackets(pToSend);
+                }
+            }
+            if (d->isCraftingOutGoing(localDevSrc)) {
+                pToSend = action.craftOutGoing(inPacket);
+                if (pToSend->size() > 0) {
+                    DEBUG("-> 1 out packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
+                    //cout << pToSend->size() << endl;
+                    d->sendPackets(pToSend);
+                }
             }
             return;
         }
@@ -228,23 +243,14 @@ public:
         //DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevSrc->getIPv4Address().toString() << endl);
         //modalità solo protocollo interessato?!?!?!?!?!?!?
         //senza di questo potrei non riuscire a tenere la comunicazione perchè tolgo pacchetti di servizio
-        d->sendPacket(inPacket);
+        //d->sendPacket(inPacket);
     }
 
 private:
-    bool hasCorrectDirection(PcapLiveDevice *devFromPacketComes) {
-        return direction == Both ||
-               (direction == LeftToRight && devFromPacketComes == devSrc) ||
-               (direction == RightToLeft && devFromPacketComes == devDst);
+    bool isCraftingOutGoing(PcapLiveDevice *devFromPacketComes) {
+        return (direction == Both || direction == OutGoing) && devFromPacketComes->getIPv4Address() == devDst->getIPv4Address();
     }
-    void direc(PcapLiveDevice *devFromPacketComes) {
-        cout << "==========> " << devFromPacketComes->getIPv4Address().toString()
-             << " =?= " << devSrc->getIPv4Address().toString()
-             << " or "
-             << " =?= " << devDst->getIPv4Address().toString() << " -> "
-             << direction << " = "
-             << (direction == LeftToRight && devFromPacketComes == devSrc) << " or "
-             << (direction == RightToLeft && devFromPacketComes == devDst)
-             << endl;
+    bool isCraftingInGoing(PcapLiveDevice *devFromPacketComes) {
+        return (direction == Both || direction == InGoing) && devFromPacketComes->getIPv4Address() == devSrc->getIPv4Address();
     }
 };

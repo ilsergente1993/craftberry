@@ -32,7 +32,8 @@ public:
     static const int level;
     Action() : shots(0){};
     ~Action(){};
-    virtual vector<RawPacket *> *craft(RawPacket *) = 0;
+    virtual vector<RawPacket *> *craftInGoing(RawPacket *) = 0;
+    virtual vector<RawPacket *> *craftOutGoing(RawPacket *) = 0;
 
     int getShots() { return this->shots; };
 };
