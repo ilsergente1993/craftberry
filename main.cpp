@@ -23,10 +23,10 @@ using namespace std;
 using namespace pcpp;
 
 //DOC: struct storaging the usage options for the CLI
-const char *const CraftberryOptionsShort = "A:B:a:t:l:d:ih";
+const char *const CraftberryOptionsShort = "I:E:a:t:l:d:ih";
 static struct option CraftberryOptions[] =
-    {{"interfac_src", required_argument, 0, 'A'},
-     {"interface_dst", required_argument, 0, 'B'},
+    {{"internal_interface", required_argument, 0, 'I'},
+     {"external_interface", required_argument, 0, 'E'},
      {"action", required_argument, 0, 'a'},
      {"timeout", required_argument, 0, 't'},
      {"log", required_argument, 0, 'l'},
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);
 
-    string interfaceSrc = "", interfaceDst = "";
+    string interfaceInt = "", interfaceExt = "";
     string action = "BEQUITE";
     string logName = "captures/out_" + to_string(time(0)) + ".pcapng";
     PacketDirection direction = Both;
@@ -69,11 +69,11 @@ int main(int argc, char *argv[]) {
         switch (opt) {
         case 0:
             break;
-        case 'A':
-            interfaceSrc = optarg;
+        case 'I':
+            interfaceInt = optarg;
             break;
-        case 'B':
-            interfaceDst = optarg;
+        case 'E':
+            interfaceExt = optarg;
             break;
         case 'a':
             action = optarg;
@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
                 direction = OutGoing;
             else
                 direction = Both;
+            break;
         case 'i':
             listInterfaces();
             exit(-1);
@@ -106,11 +107,18 @@ int main(int argc, char *argv[]) {
         cout << "Dude, let's do some action!" << endl;
         exit(1);
     }
-    gd = new Details{action, interfaceSrc, interfaceDst, logName, direction};
+    gd = new Details{action, interfaceInt, interfaceExt, logName, direction};
     gd->toString();
 
     //DOC: start packet capturing
-    gd->devSrc->startCapture(Details::callback, gd);
+    // packets going from EXT to INT
+    if (direction == PacketDirection::InGoing || direction == PacketDirection::Both)
+        gd->devExt->startCapture(Details::callback, gd);
+
+    // packets going from INT to EXT
+    if (direction == PacketDirection::OutGoing || direction == PacketDirection::Both)
+        gd->devInt->startCapture(Details::callback, gd);
+
     if (timeout == 0) {
         cout << "Working in infinite mode, press ctrl+c to exit..." << endl;
         while (1) {

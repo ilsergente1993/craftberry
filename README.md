@@ -14,8 +14,8 @@ craftberry -A interface_src -B interface_dst { -a ATTACKNAME | -d DEFENSENAME }
  -A interface_src -B interface_dst -a [ ATTACK | DEFENSE ]
 
 Options:
-    -A            : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address
-    -B            : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address
+    -I            : Use the specified internal interface. Can be interface name (e.g eth0) or interface IPv4 address
+    -E            : Use the specified external interface. Can be interface name (e.g eth0) or interface IPv4 address
     -a            : Use the specified action
     -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)
     -l            : Write the output stream sent to the destination interface into a pcapng file having name passed by parameter or, if the parameter's equal to 'default', the name is 'out_<epoch_ms>'

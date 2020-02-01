@@ -10,3 +10,15 @@ all:
 clear:
 	rm main.o
 	rm craftberry
+
+test2:
+	rm test.o
+	rm test
+	g++ $(PCAPPP_BUILD_FLAGS) $(PCAPPP_INCLUDES) -c -o test.o test.cpp  -lnetfilter_queue
+	g++ $(PCAPPP_LIBS_DIR) -static-libstdc++ -o test test.o $(PCAPPP_LIBS)  -lnetfilter_queue
+
+nfqueue:
+	# rm nfqueue_test.o
+	# rm nfqueue_test
+	g++ $(PCAPPP_BUILD_FLAGS) $(PCAPPP_INCLUDES) -c -o nfqueue_test.o nfqueue_test.cpp -lnetfilter_queue
+	g++ $(PCAPPP_LIBS_DIR) -static-libstdc++ -o nfqueue_test nfqueue_test.o $(PCAPPP_LIBS) -lnetfilter_queue
