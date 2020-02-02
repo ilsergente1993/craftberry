@@ -48,17 +48,24 @@ extern "C" {
 #define CHECK(x, m) \
     ASSERT(x, m, nullptr)
 
-#define IPTABLES(proto, isdel)            \
-    system((                              \
-               "\n#/bin/bash\n\n"s +      \
-               "sudo iptables "s +        \
-               (!isdel ? "-A"s : "-D"s) + \
-               " INPUT -p "s +            \
-               #proto +                   \
-               " -j NFQUEUE"s)            \
+#define IPTABLES(proto, isdel)         \
+    system(("\n#/bin/bash\n\n"s +      \
+            "sudo iptables "s +        \
+            (!isdel ? "-A"s : "-D"s) + \
+            " INPUT -p "s +            \
+            #proto +                   \
+            " -j NFQUEUE"s)            \
                .c_str());
 
 using namespace std;
+
+void printAllLayers(pcpp::Packet *p) {
+    pcpp::Layer *L = p->getFirstLayer();
+    while (L != nullptr) {
+        cout << "\tLEV: " << L->getOsiModelLayer() << " => " << L->toString() << endl;
+        L = L->getNextLayer();
+    }
+}
 
 static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data) {
     cout << "entering callback" << endl;
@@ -72,44 +79,44 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
 
     struct timeval timestamp;
     nfq_get_timestamp(nfa, &timestamp);
-
     //DOC: creo il pacchetto pcapPlusPlus
-    pcpp::RawPacket inPacketRaw(static_cast<uint8_t *>(rawData), len, timestamp, false, pcpp::LINKTYPE_RAW);
+    pcpp::RawPacket *inPacketRaw = new pcpp::RawPacket(static_cast<uint8_t *>(rawData), len, timestamp, false, pcpp::LINKTYPE_RAW);
 
-    pcpp::Packet inPacket(&inPacketRaw);
-    pcpp::EthLayer newEthernetLayer(pcpp::MacAddress("f0:4b:3a:4f:80:30"), pcpp::MacAddress("a2:ee:e9:dd:4c:14"));
-    inPacket.insertLayer(NULL, &newEthernetLayer, true);
-    inPacket.computeCalculateFields();
+    pcpp::Packet *inPacket = new pcpp::Packet(inPacketRaw);
+    pcpp::EthLayer *newEthernetLayer = new pcpp::EthLayer(pcpp::MacAddress("f0:4b:3a:4f:80:30"), pcpp::MacAddress("a2:ee:e9:dd:4c:14"));
+    inPacket->insertLayer(nullptr, newEthernetLayer, true);
+    inPacket->computeCalculateFields();
+    pcpp::IPv4Address ip("165.22.66.6");
+    if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
+        return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
+    }
 
     //DOC: scrorro i pacchetti per inspezione
-    pcpp::Layer *L = inPacket.getFirstLayer();
-    cout << "Pacchetto In" << endl;
-    while (L != nullptr) {
-        cout << "\t" << L->getOsiModelLayer() << " => " << L->toString() << endl;
-        L = L->getNextLayer();
-    }
+    cout << "IN:  " << inPacket->getLastLayer()->toString() << endl;
+    //printAllLayers(inPacket);
 
-    cout << "Invio il pacchetto" << endl;
+    //DOC: creo e riempio il secondo pacchetto
+    pcpp::RawPacket *outPacketRaw = new pcpp::RawPacket();
+    outPacketRaw->setRawData(inPacket->getRawPacket()->getRawData(), inPacket->getRawPacket()->getRawDataLen(), timestamp);
+    pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
+
+    cout << "OUT: " << outPacket->getLastLayer()->toString() << endl;
+    //printAllLayers(outPacket);
+
+    cout << " -- pacchetto copiato" << endl;
 
     //DOC: apro il dispositivo di destinazione
-    string dstAddr = inPacket.getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().toString();
+    //TODO: deve essere della tun0 e non dell'interfaccia pubblica. per test metto eth1
+    string dstAddr = "10.135.63.160";
     pcpp::PcapLiveDevice *dev = pcpp::PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(dstAddr.c_str());
-    ASSERT(dev == NULL, "Cannot find interface with IPv4 address of "s + dstAddr, exit(1));
+    ASSERT(dev == nullptr, "Cannot find interface with IPv4 address of "s + dstAddr, exit(1));
     ASSERT(!dev->open(), "Cannot open device", exit(1));
 
-    //DOC: creo ed invio una secondo pacchetto identico
-    pcpp::RawPacket outPacketRaw(*inPacket.getRawPacketReadOnly());
-    pcpp::Packet outPacket(&outPacketRaw);
-
-    pcpp::Layer *LL = outPacket.getFirstLayer();
-    cout << "Pacchetto Out" << endl;
-    while (LL != nullptr) {
-        cout << "\t" << LL->getOsiModelLayer() << " => " << LL->toString() << endl;
-        LL = LL->getNextLayer();
-    }
-
-    CHECK(!dev->pcpp::PcapLiveDevice::sendPacket(outPacketRaw), "packet not sent");
+    CHECK(!dev->pcpp::PcapLiveDevice::sendPacket(*outPacket->getRawPacket()), "packet not sent");
+    CHECK(!dev->pcpp::PcapLiveDevice::sendPacket(*outPacket->getRawPacket()), "packet not sent");
+    CHECK(!dev->pcpp::PcapLiveDevice::sendPacket(*outPacket->getRawPacket()), "packet not sent");
     dev->close();
+    cout << " -- pacchetto inviato a (" << dev->getName() << ") " << dev->getIPv4Address().toString() << endl;
 
     //DOC: invio il verdetto
     return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
