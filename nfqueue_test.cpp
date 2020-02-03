@@ -79,6 +79,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
 
     struct timeval timestamp;
     nfq_get_timestamp(nfa, &timestamp);
+
     //DOC: creo il pacchetto pcapPlusPlus
     pcpp::RawPacket *inPacketRaw = new pcpp::RawPacket(static_cast<uint8_t *>(rawData), len, timestamp, false, pcpp::LINKTYPE_RAW);
 
@@ -87,6 +88,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     inPacket->insertLayer(nullptr, newEthernetLayer, true);
     inPacket->computeCalculateFields();
     pcpp::IPv4Address ip("165.22.66.6");
+    //DOC: accetto tutto il traffico che non è diretto al mio IP
     if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
         return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
     }
@@ -125,7 +127,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
 int main(/*int argc, char **argv*/) {
     // cout << "adding iptables rule" << endl;
     // IPTABLES("udp", false);
-
+    int num_queue = 0;
     struct nfq_handle *handler = nfq_open();
     ASSERT(handler == nullptr, "Can\'t open hfqueue handler.", exit(1));
 
@@ -134,7 +136,7 @@ int main(/*int argc, char **argv*/) {
     // cout << "binding nfnetlink_queue as nf_queue handler for AF_INET\n";
     // ASSERT(nfq_bind_pf(handler, AF_INET) < 0, "error during nfq_bind_pf()\n", exit(1));
 
-    struct nfq_q_handle *queue = nfq_create_queue(handler, 0, &callback, nullptr);
+    struct nfq_q_handle *queue = nfq_create_queue(handler, num_queue, &callback, nullptr);
     ASSERT(queue == nullptr, "Can\'t create queue handler.", exit(1));
     ASSERT(nfq_set_mode(queue, NFQNL_COPY_PACKET, 0xffff) < 0, "Can\'t set queue copy mode.", exit(1));
     int fd = nfq_fd(handler);

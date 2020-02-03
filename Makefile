@@ -12,13 +12,7 @@ clear:
 	rm craftberry
 
 nfqueue:
-	# rm nfqueue_test.o
-	# rm nfqueue_test
-	g++ $(PCAPPP_BUILD_FLAGS) $(PCAPPP_INCLUDES) -c -o nfqueue_test.o nfqueue_test.cpp -lnetfilter_queue
-	g++ $(PCAPPP_LIBS_DIR) -static-libstdc++ -o nfqueue_test nfqueue_test.o $(PCAPPP_LIBS) -lnetfilter_queue
-
-nfqueue2:
 	#rm nfqueue_test2.o
 	#rm nfqueue_test2
-	g++ $(PCAPPP_BUILD_FLAGS) $(PCAPPP_INCLUDES) -c -o nf_queue_test2.o nf_queue_test2.cpp -lnetfilter_queue
-	g++ $(PCAPPP_LIBS_DIR) -static-libstdc++ -o nf_queue_test2 nf_queue_test2.o $(PCAPPP_LIBS) -lnetfilter_queue
+	g++ $(PCAPPP_BUILD_FLAGS) $(PCAPPP_INCLUDES) -c -o main2.o main2.cpp -lnetfilter_queue
+	g++ $(PCAPPP_LIBS_DIR) -static-libstdc++ -o main2 main2.o $(PCAPPP_LIBS) -lnetfilter_queue
