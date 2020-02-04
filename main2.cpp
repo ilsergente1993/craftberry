@@ -75,32 +75,42 @@ static struct option CraftberryOptions[] =
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
 
-void ctrlc(int);
+void ctrl_c(int);
 void help();
 void listInterfaces();
 void printAllLayers(pcpp::Packet *p);
 static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 bool sendPkt(RawPacket *p, PcapLiveDevice *destination);
 void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination);
-struct Configuration *conf;
+
+//DOC: global vars
+struct Configuration *conf = nullptr;
+struct nfq_q_handle *queue = nullptr;
+struct nfq_handle *handler = nullptr;
 
 //DOC: handler function to manage external signals
-void ctrlc(int s) {
+void ctrl_c(int s) {
+    if (conf == nullptr)
+        exit(1);
     cerr << "\nOoooops got ctrl+c signal (" << s << ")\nHere a summary of what happened:";
     conf->summary();
     delete conf;
+    //DOC: deleting the queue and freeing resources
+    cout << "exiting from craftberry" << endl;
+    nfq_destroy_queue(queue);
+    nfq_close(handler);
     cout << "bye bye\n";
     exit(1);
 }
-
 int main(int argc, char *argv[]) {
     //DOC: setup for ctrl+c signal
     struct sigaction sigIntHandler;
-    sigIntHandler.sa_handler = ctrlc;
+    sigIntHandler.sa_handler = ctrl_c;
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);
 
+    //DOC: reading cli parameters
     string interfaceTun0 = "";
     string action = "BEQUITE";
     string logName = "captures/out_" + to_string(time(0)) + ".pcapng";
@@ -144,40 +154,40 @@ int main(int argc, char *argv[]) {
         cout << "Dude, let's do some action!" << endl;
         exit(1);
     }
-    //DOC: setup dell'oggetto di configurazione
+
+    //DOC: setup of the configuration obj
     conf = new Configuration{action, "10.135.63.160" /*interfaceTun0*/, logName, direction};
     conf->toString();
 
+    //DOC: setup the queue handling
     cout << "adding iptables rule" << endl;
     // IPTABLES("udp", false);
+
     int num_queue = 0;
-    struct nfq_handle *handler = nfq_open();
+    handler = nfq_open();
     ASSERT(handler == nullptr, "Can\'t open hfqueue handler.", exit(1));
 
-    // cout << "unbinding existing nf_queue handler for AF_INET (if any)\n";
-    // ASSERT(nfq_unbind_pf(handler, AF_INET) < 0, "error during nfq_unbind_pf()\n", exit(1));
-    // cout << "binding nfnetlink_queue as nf_queue handler for AF_INET\n";
-    // ASSERT(nfq_bind_pf(handler, AF_INET) < 0, "error during nfq_bind_pf()\n", exit(1));
+    //cout << "unbinding existing nf_queue handler for AF_INET (if any)\n";
+    ASSERT(nfq_unbind_pf(handler, AF_INET) < 0, "error during nfq_unbind_pf()\n", exit(1));
+    //cout << "binding nfnetlink_queue as nf_queue handler for AF_INET\n";
+    ASSERT(nfq_bind_pf(handler, AF_INET) < 0, "error during nfq_bind_pf()\n", exit(1));
 
-    struct nfq_q_handle *queue = nfq_create_queue(handler, num_queue, &callback, nullptr);
+    queue = nfq_create_queue(handler, num_queue, &callback, nullptr);
     ASSERT(queue == nullptr, "Can\'t create queue handler.", exit(1));
     ASSERT(nfq_set_mode(queue, NFQNL_COPY_PACKET, 0xffff) < 0, "Can\'t set queue copy mode.", exit(1));
     int fd = nfq_fd(handler);
     std::array<char, 0x10000> buffer;
-    //DOC: start packet capturing
 
-    if (timeout == 0) {
+    //DOC: this is the main cycle where the read and the callback happen
+    if (true || timeout == 0) {
         cout << "Working in infinite mode, press ctrl+c to exit..." << endl;
-        while (1) {
+        while (true) {
             //DOC: I quit only when ctrl+c is pressed
+            // cout << "aspetto" << endl;
             int len = read(fd, buffer.data(), buffer.size());
             CHECK(len < 0, "Issue while read");
             nfq_handle_packet(handler, buffer.data(), len);
         };
-        cout << "exiting from craftberry" << endl;
-        nfq_destroy_queue(queue);
-        nfq_close(handler);
-
         // cout << "removing iptables rule" << endl;
         // IPTABLES("icmp", true);
     } else {
@@ -187,16 +197,19 @@ int main(int argc, char *argv[]) {
         //         cout << timeout << " seconds left" << endl;
         // };
         // cout << "Finished" << endl;
-
         // conf->summary();
     }
 
+    //DOC: deleting the queue and freeing resources
+    cout << "exiting from craftberry" << endl;
+    nfq_destroy_queue(queue);
+    nfq_close(handler);
     delete conf;
     return 0;
 };
 
 static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data) {
-    cout << "entering callback" << endl;
+    //cout << "entering callback" << endl;
 
     //DOC: ottengo il payload del pacchetto
     struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
@@ -208,66 +221,65 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     struct timeval timestamp;
     nfq_get_timestamp(nfa, &timestamp);
 
-    //DOC: creo il pacchetto pcapPlusPlus
+    //DOC: creo il pacchetto pcapPlusPlus dal payload restituito da nf_queue
     pcpp::RawPacket *inPacketRaw = new pcpp::RawPacket(static_cast<uint8_t *>(rawData), len, timestamp, false, pcpp::LINKTYPE_RAW);
     pcpp::Packet *inPacket = new pcpp::Packet(inPacketRaw);
-    pcpp::EthLayer *newEthernetLayer = new pcpp::EthLayer(pcpp::MacAddress("f0:4b:3a:4f:80:30"), pcpp::MacAddress("a2:ee:e9:dd:4c:14"));
-    inPacket->insertLayer(nullptr, newEthernetLayer, true);
+    // pcpp::EthLayer *newEthernetLayer = new pcpp::EthLayer(pcpp::MacAddress("f0:4b:3a:4f:80:30"), pcpp::MacAddress("a2:ee:e9:dd:4c:14"));
+    // inPacket->insertLayer(nullptr, newEthernetLayer, true);
     inPacket->computeCalculateFields();
     pcpp::IPv4Address ip("165.22.66.6");
 
-    //DOC: accetto tutto il traffico che non è diretto al mio IP
-    if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
-        return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
-    }
-
-    vector<RawPacket *> *pToSend;
     conf->received.bytes += inPacketRaw->getRawDataLen();
     conf->received.packets++;
 
+    //DOC: scrorro i pacchetti per inspezione
+    DEBUG("[#" << conf->received.packets << "] -> " << inPacket->getLastLayer()->toString() << endl);
+    //printAllLayers(inPacket);
+
+    /*//DOC: accetto tutto il traffico che non è diretto al mio IP
+    if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
+        return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
+    }*/
+
+    vector<RawPacket *> *pToSend;
     if (conf->method.compare("BEQUITE") == 0) {
         return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
     }
 
-    /*if (conf->method.compare("DNSROBBER") == 0) {
+    if (conf->method.compare("DNSROBBER") == 0 && DnsRobber::isDns(inPacket)) {
         DnsRobber action;
-        if (conf->isCraftingInGoing(localDevInt)) {
-            pToSend = action.craftInGoing(inPacket);
-            if (pToSend->size() > 0) {
-                DEBUG("-> 1 in packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-                //cout << pToSend->size() << endl;
-                //d->sendPackets(pToSend, d->devInt);
-            }
-        }
-        if (conf->isCraftingOutGoing(localDevInt)) {
-            pToSend = action.craftOutGoing(inPacket);
-            if (pToSend->size() > 0) {
-                DEBUG("-> 1 out packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-                //cout << pToSend->size() << endl;
-                //d->sendPackets(pToSend, d->devExt);
-            }
-        }
-        return;
-    }*/
+        //Packet *p;
+        action.singleCraftInGoing(inPacket);
+        //ASSERT(, "DNSROBBER failed for some reason", exit(1));
+        //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, nullptr);
+        //printAllLayers(p);
 
-    //DOC: scrorro i pacchetti per inspezione
-    cout << "IN:  " << inPacket->getLastLayer()->toString() << endl;
-    printAllLayers(inPacket);
+        pcpp::RawPacket *outPacketRaw = new pcpp::RawPacket();
+        outPacketRaw->setRawData(inPacket->getRawPacket()->getRawData(), inPacket->getRawPacket()->getRawDataLen(), timestamp);
+        pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
 
-    //DOC: creo e riempio il secondo pacchetto
-    pcpp::RawPacket *outPacketRaw = new pcpp::RawPacket();
-    outPacketRaw->setRawData(inPacket->getRawPacket()->getRawData(), inPacket->getRawPacket()->getRawDataLen(), timestamp);
-    pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
+        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
+        return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_DROP, 0, NULL);
+        //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, len, (unsigned char *)rawData);
+    }
 
-    cout << "OUT: " << outPacket->getLastLayer()->toString() << endl;
-    printAllLayers(outPacket);
+    //TODO: per copia ed invio del pacchetto
+    if (false) {
+        //DOC: creo e riempio il secondo pacchetto
+        pcpp::RawPacket *outPacketRaw = new pcpp::RawPacket();
+        outPacketRaw->setRawData(inPacket->getRawPacket()->getRawData(), inPacket->getRawPacket()->getRawDataLen(), timestamp);
+        pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
 
-    //cout << " -- pacchetto copiato" << endl;
-    CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
-    CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
-    CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
+        cout << "OUT: " << outPacket->getLastLayer()->toString() << endl;
+        printAllLayers(outPacket);
 
-    DEBUG(" -- pacchetto inviato a (" << conf->devTun0->getName() << ") " << conf->devTun0->getIPv4Address().toString() << endl);
+        //cout << " -- pacchetto copiato" << endl;
+        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
+        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
+        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
+
+        DEBUG(" -- pacchetto inviato a (" << conf->devTun0->getName() << ") " << conf->devTun0->getIPv4Address().toString() << endl);
+    }
 
     //DOC: invio il verdetto
     return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
@@ -334,7 +346,7 @@ void help() {
 void printAllLayers(pcpp::Packet *p) {
     pcpp::Layer *L = p->getFirstLayer();
     while (L != nullptr) {
-        cout << "\tLEV: " << L->getOsiModelLayer() << " => " << L->toString() << endl;
+        cout << "\t\tLEV: " << L->getOsiModelLayer() << " => " << L->toString() << endl;
         L = L->getNextLayer();
     }
 }

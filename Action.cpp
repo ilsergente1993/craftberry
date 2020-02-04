@@ -35,5 +35,7 @@ public:
     virtual vector<RawPacket *> *craftInGoing(RawPacket *) = 0;
     virtual vector<RawPacket *> *craftOutGoing(RawPacket *) = 0;
 
+    virtual void singleCraftInGoing(Packet *) = 0;
+
     int getShots() { return this->shots; };
 };

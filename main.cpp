@@ -35,13 +35,13 @@ static struct option CraftberryOptions[] =
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
 
-void ctrlc(int);
+void ctrl_c(int);
 void help();
 void listInterfaces();
 struct Details *gd;
 
 //DOC: handler function to manage external signals
-void ctrlc(int s) {
+void ctrl_c(int s) {
     cerr << "\nOoooops got ctrl+c signal (" << s << ")\nHere a summary of what happened:";
     gd->summary();
     delete gd;
@@ -52,7 +52,7 @@ void ctrlc(int s) {
 int main(int argc, char *argv[]) {
     //DOC: setup for ctrl+c signal
     struct sigaction sigIntHandler;
-    sigIntHandler.sa_handler = ctrlc;
+    sigIntHandler.sa_handler = ctrl_c;
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);

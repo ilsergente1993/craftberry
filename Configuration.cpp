@@ -139,7 +139,7 @@ public:
             //d->sendPackets(pp);
             return;
         }
-
+        /*
         if (conf->method.compare("TCPMULTIPLY") == 0) {
             if (!conf->isCraftingOutGoing(localDevInt))
                 return;
@@ -194,7 +194,7 @@ public:
             }
             return;
         }
-
+*/
         //se non è nessuno dei precedenti cmq rimbalzo tutto
         //DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
         //modalità solo protocollo interessato?!?!?!?!?!?!?
