@@ -53,14 +53,8 @@ extern "C" {
 #define CHECK(x, m) \
     ASSERT(x, m, nullptr)
 
-#define IPTABLES(proto, isdel)         \
-    system(("\n#/bin/bash\n\n"s +      \
-            "sudo iptables "s +        \
-            (!isdel ? "-A"s : "-D"s) + \
-            " INPUT -p "s +            \
-            #proto +                   \
-            " -j NFQUEUE"s)            \
-               .c_str());
+#define IPTABLES(s) \
+    system(s);
 
 using namespace std;
 using namespace pcpp;
@@ -84,6 +78,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
 bool sendPkt(RawPacket *p, PcapLiveDevice *destination);
 void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination);
 void quitCraftberry();
+void makeIptableCmd(bool);
 
 //DOC: global vars
 struct Configuration *conf = nullptr;
@@ -106,6 +101,8 @@ void quitCraftberry() {
     cout << "exiting from craftberry" << endl;
     nfq_destroy_queue(queue);
     nfq_close(handler);
+    cout << "removing iptables rule" << endl;
+    makeIptableCmd(true);
     cout << "bye bye\n";
 }
 //DOC: just the main
@@ -121,7 +118,7 @@ int main(int argc, char *argv[]) {
     string interfaceTun0 = "";
     string action = "BEQUITE";
     string logName = "captures/out_" + to_string(time(0)) + ".pcapng";
-    PacketDirection direction = Both;
+    PacketDirection direction = InGoing;
     int optionIndex = 0, timeout = 0;
     char opt = 0;
     //':' => significa che si aspetta degli argomenti
@@ -143,12 +140,12 @@ int main(int argc, char *argv[]) {
                 (logName = optarg) += ".pcapng";
             break;
         case 'd':
-            if (strcmp(&optarg[0], "in") == 0)
+            if (strcmp(&optarg[0], "IN") == 0)
                 direction = InGoing;
-            else if (strcmp(&optarg[0], "out") == 0)
+            else if (strcmp(&optarg[0], "OUT") == 0)
                 direction = OutGoing;
             else
-                direction = Both;
+                cout << "direction value not valid" << endl;
             break;
         case 'h':
         default:
@@ -168,9 +165,8 @@ int main(int argc, char *argv[]) {
 
     //DOC: setup the queue handling
     cout << "adding iptables rule" << endl;
-    // IPTABLES("udp", false);
+    makeIptableCmd(false);
 
-    int num_queue = 0;
     handler = nfq_open();
     ASSERT(handler == nullptr, "Can\'t open hfqueue handler.", exit(1));
 
@@ -179,7 +175,7 @@ int main(int argc, char *argv[]) {
     //cout << "binding nfnetlink_queue as nf_queue handler for AF_INET\n";
     ASSERT(nfq_bind_pf(handler, AF_INET) < 0, "error during nfq_bind_pf()\n", exit(1));
 
-    queue = nfq_create_queue(handler, num_queue, &callback, nullptr);
+    queue = nfq_create_queue(handler, static_cast<std::underlying_type<Direction>::type>(direction), &callback, nullptr);
     ASSERT(queue == nullptr, "Can\'t create queue handler.", exit(1));
     ASSERT(nfq_set_mode(queue, NFQNL_COPY_PACKET, 0xffff) < 0, "Can\'t set queue copy mode.", exit(1));
     int fd = nfq_fd(handler);
@@ -236,7 +232,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
 
     //DOC: scrorro i pacchetti per inspezione
     DEBUG("[#" << conf->received.packets << "] -> " << inPacket->getLastLayer()->toString() << endl);
-    //printAllLayers(inPacket);
+    printAllLayers(inPacket);
 
     /*//DOC: accetto tutto il traffico che non è diretto al mio IP
     if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
@@ -352,3 +348,26 @@ void printAllLayers(pcpp::Packet *p) {
         L = L->getNextLayer();
     }
 }
+
+void makeIptableCmd(bool isDeleting) {
+    string proto = "";
+    if (conf->method.compare("BEQUITE") == 0) {
+        proto = "icmp"; //TODO: cambiare
+    } else if (conf->method.compare("DNSROBBER") == 0) {
+        proto = "udp port 53";
+    } else if (conf->method.compare("ICMPMULTIPY") == 0) {
+        proto = "icmp";
+    } else if (conf->method.compare("UDPMULTIPYF") == 0) {
+        proto = "udp";
+    } else if (conf->method.compare("TCPMULTIPY") == 0) {
+        proto = "tcp";
+    }
+    string cmd = ("\n#/bin/bash\n\n"s +
+                  "sudo iptables -t nat "s +
+                  (!isDeleting ? "-I "s : "-D "s) +
+                  (conf->direction == 1 ? "PREROUTING "s : "POSTROUTING "s) +
+                  "-p "s + proto + " -j NFQUEUE "s +
+                  " --queue-num "s + (conf->direction == 1 ? "1"s : "2"s));
+    cout << cmd << endl;
+    IPTABLES(cmd.c_str());
+};

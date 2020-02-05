@@ -23,9 +23,8 @@
 using namespace std;
 using namespace pcpp;
 
-enum PacketDirection { Both,
-                       InGoing,
-                       OutGoing };
+enum PacketDirection { InGoing = 1,
+                       OutGoing = 2 };
 
 struct Traffic {
     double bytes = 0;
@@ -33,7 +32,7 @@ struct Traffic {
 };
 
 struct Configuration {
-public:
+  public:
     struct Traffic received;
     struct Traffic crafted;
     struct Traffic created;
@@ -94,7 +93,7 @@ public:
         cout << "0---------------------------------------------------------0" << endl;
         cout << "\tMethod:                " << method << endl;
         cout << "\tLogfile:               " << devLogFile->getFileName() << endl;
-        cout << "\tDirection:             " << (direction == Both ? "in&out" : (direction == InGoing ? "in" : "out")) << endl;
+        cout << "\tDirection:             " << (direction == InGoing ? "IN" : "OUT") << endl;
         //cout << "\tAddress Data:          " << data << endl;
         if (!devTun0->open()) {
             cout << "devTun0 is not opened" << endl;
@@ -202,7 +201,7 @@ public:
         //d->sendPacket(inPacket);
     }
 
-private:
+  private:
     bool isCraftingInGoing(PcapLiveDevice *devFromPacketComes) {
         //cout << devFromPacketComes->getIPv4Address().toInt() << " =?= " << devExt->getIPv4Address().toInt() << endl;
         return devFromPacketComes->getIPv4Address().toInt(); // == devExt->getIPv4Address().toInt();
