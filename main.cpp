@@ -190,6 +190,7 @@ int main(int argc, char *argv[]) {
         std::thread t([&timeout]() {
             std::this_thread::sleep_for(std::chrono::seconds(timeout));
             quitCraftberry();
+            exit(0);
         });
         t.detach();
         cout << "Working in timeout mode: " << timeout << " seconds left." << endl;
