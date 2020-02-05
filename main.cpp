@@ -95,16 +95,16 @@ void ctrl_c(int s) {
 }
 //DOC: all the ops to close the app
 void quitCraftberry() {
-    conf->summary();
-    delete conf;
     //DOC: deleting the queue and freeing resources
-    cout << "exiting from craftberry" << endl;
     nfq_destroy_queue(queue);
     nfq_close(handler);
+    conf->summary();
+    delete conf;
     cout << "removing iptables rule" << endl;
     makeIptableCmd(true);
     cout << "bye bye\n";
 }
+
 //DOC: just the main
 int main(int argc, char *argv[]) {
     //DOC: setup for ctrl+c signal
@@ -183,6 +183,7 @@ int main(int argc, char *argv[]) {
 
     //DOC: this is the main cycle where the read and the callback happen
     if (timeout > 0) {
+        //DOC: timeout thread
         std::thread t([&timeout]() {
             std::this_thread::sleep_for(std::chrono::seconds(timeout));
             quitCraftberry();
@@ -199,9 +200,6 @@ int main(int argc, char *argv[]) {
         CHECK(len < 0, "Issue while read");
         nfq_handle_packet(handler, buffer.data(), len);
     };
-    // cout << "removing iptables rule" << endl;
-    // IPTABLES("icmp", true);
-
     quitCraftberry();
     return 0;
 };
@@ -355,12 +353,14 @@ void makeIptableCmd(bool isDeleting) {
         proto = "icmp"; //TODO: cambiare
     } else if (conf->method.compare("DNSROBBER") == 0) {
         proto = "udp port 53";
-    } else if (conf->method.compare("ICMPMULTIPY") == 0) {
+    } else if (conf->method.compare("ICMP") == 0) {
         proto = "icmp";
     } else if (conf->method.compare("UDPMULTIPYF") == 0) {
         proto = "udp";
     } else if (conf->method.compare("TCPMULTIPY") == 0) {
         proto = "tcp";
+    } else if (conf->method.compare("HTTP") == 0) {
+        proto = "tcp -m multiport --dports 80,443";
     }
     string cmd = ("\n#/bin/bash\n\n"s +
                   "sudo iptables -t nat "s +
