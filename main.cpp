@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <thread>
 
 #include "pcapplusplus/DnsLayer.h"
 #include "pcapplusplus/EthLayer.h"
@@ -82,6 +83,7 @@ void printAllLayers(pcpp::Packet *p);
 static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 bool sendPkt(RawPacket *p, PcapLiveDevice *destination);
 void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination);
+void quitCraftberry();
 
 //DOC: global vars
 struct Configuration *conf = nullptr;
@@ -93,6 +95,11 @@ void ctrl_c(int s) {
     if (conf == nullptr)
         exit(1);
     cerr << "\nOoooops got ctrl+c signal (" << s << ")\nHere a summary of what happened:";
+    quitCraftberry();
+    exit(1);
+}
+//DOC: all the ops to close the app
+void quitCraftberry() {
     conf->summary();
     delete conf;
     //DOC: deleting the queue and freeing resources
@@ -100,8 +107,8 @@ void ctrl_c(int s) {
     nfq_destroy_queue(queue);
     nfq_close(handler);
     cout << "bye bye\n";
-    exit(1);
 }
+//DOC: just the main
 int main(int argc, char *argv[]) {
     //DOC: setup for ctrl+c signal
     struct sigaction sigIntHandler;
@@ -179,32 +186,26 @@ int main(int argc, char *argv[]) {
     std::array<char, 0x10000> buffer;
 
     //DOC: this is the main cycle where the read and the callback happen
-    if (true || timeout == 0) {
-        cout << "Working in infinite mode, press ctrl+c to exit..." << endl;
-        while (true) {
-            //DOC: I quit only when ctrl+c is pressed
-            // cout << "aspetto" << endl;
-            int len = read(fd, buffer.data(), buffer.size());
-            CHECK(len < 0, "Issue while read");
-            nfq_handle_packet(handler, buffer.data(), len);
-        };
-        // cout << "removing iptables rule" << endl;
-        // IPTABLES("icmp", true);
+    if (timeout > 0) {
+        std::thread t([&timeout]() {
+            std::this_thread::sleep_for(std::chrono::seconds(timeout));
+            quitCraftberry();
+        });
+        t.detach();
+        cout << "Working in timeout mode: " << timeout << " seconds left." << endl;
     } else {
-        // while (--timeout >= 0) {
-        //     PCAP_SLEEP(1);
-        //     if (timeout > 0)
-        //         cout << timeout << " seconds left" << endl;
-        // };
-        // cout << "Finished" << endl;
-        // conf->summary();
+        cout << "Working in infinite mode, press ctrl+c to exit..." << endl;
     }
+    while (true) {
+        //DOC: I quit only when ctrl+c is pressed
+        int len = read(fd, buffer.data(), buffer.size());
+        CHECK(len < 0, "Issue while read");
+        nfq_handle_packet(handler, buffer.data(), len);
+    };
+    // cout << "removing iptables rule" << endl;
+    // IPTABLES("icmp", true);
 
-    //DOC: deleting the queue and freeing resources
-    cout << "exiting from craftberry" << endl;
-    nfq_destroy_queue(queue);
-    nfq_close(handler);
-    delete conf;
+    quitCraftberry();
     return 0;
 };
 
@@ -249,7 +250,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     if (conf->method.compare("DNSROBBER") == 0 && DnsRobber::isDns(inPacket)) {
         DnsRobber action;
         //Packet *p;
-        action.singleCraftInGoing(inPacket);
+        action.craftInGoing(inPacket);
         //ASSERT(, "DNSROBBER failed for some reason", exit(1));
         //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, nullptr);
         //printAllLayers(p);

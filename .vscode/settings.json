@@ -44,6 +44,7 @@
         "typeinfo": "cpp",
         "ctime": "cpp",
         "functional": "cpp",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "thread": "cpp"
     }
 }

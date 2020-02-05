@@ -19,32 +19,26 @@ using namespace pcpp;
 
 class TcpMultiply : public Action {
 
-public:
+  public:
     static const int level = 4;
     int n;
 
     TcpMultiply(int _n) : n(_n){};
     ~TcpMultiply(){};
-    vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
-        Packet parsedPacket(inPacket);
-        vector<RawPacket *> *pp = new vector<RawPacket *>();
-        if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
-            for (int i = 0; i < this->n; i++) {
-                pp->push_back(inPacket);
-            }
-            this->shots++;
-        }
-        return pp;
+    // vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
+    //     Packet parsedPacket(inPacket);
+    //     vector<RawPacket *> *pp = new vector<RawPacket *>();
+    //     if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
+    //         for (int i = 0; i < this->n; i++) {
+    //             pp->push_back(inPacket);
+    //         }
+    //         this->shots++;
+    //     }
+    //     return pp;
+    // }
+
+    void craftInGoing(Packet *inPacket) {
     }
-    vector<RawPacket *> *craftOutGoing(RawPacket *inPacket) {
-        Packet parsedPacket(inPacket);
-        vector<RawPacket *> *pp = new vector<RawPacket *>();
-        if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
-            for (int i = 0; i < this->n; i++) {
-                pp->push_back(inPacket);
-            }
-            this->shots++;
-        }
-        return pp;
+    void craftOutGoing(Packet *inPacket) {
     }
 };

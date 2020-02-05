@@ -19,32 +19,14 @@ using namespace pcpp;
 
 class VLanDoubleTagging : public Action {
 
-public:
+  public:
     static const int level = 2;
     int n;
 
     VLanDoubleTagging() : n(0){};
     ~VLanDoubleTagging(){};
-    vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
-        Packet parsedPacket(inPacket);
-        vector<RawPacket *> *pp = new vector<RawPacket *>();
-        // if (parsedPacket.isPacketOfType(ProtocolType::UDP)) {
-        //     for (int i = 0; i < this->n; i++) {
-        //         pp->push_back(inPacket);
-        //     }
-        //     this->shots++;
-        // }
-        return pp;
+    void craftInGoing(Packet *inPacket) {
     }
-    vector<RawPacket *> *craftOutGoing(RawPacket *inPacket) {
-        Packet parsedPacket(inPacket);
-        vector<RawPacket *> *pp = new vector<RawPacket *>();
-        // if (parsedPacket.isPacketOfType(ProtocolType::UDP)) {
-        //     for (int i = 0; i < this->n; i++) {
-        //         pp->push_back(inPacket);
-        //     }
-        //     this->shots++;
-        // }
-        return pp;
+    void craftOutGoing(Packet *inPacket) {
     }
 };

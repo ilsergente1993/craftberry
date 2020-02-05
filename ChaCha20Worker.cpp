@@ -21,7 +21,7 @@ using namespace pcpp;
 
 class ChaCha20Worker : public Action {
 
-public:
+  public:
     static const int level = 4; //TODO: 4.5?
     int n;
 
@@ -30,10 +30,8 @@ public:
     ChaCha20Worker() : n(0){};
     ~ChaCha20Worker(){};
 
-    vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
-        Packet parsedPacket(inPacket);
-        vector<RawPacket *> *pp = new vector<RawPacket *>();
-        if (parsedPacket.isPacketOfType(ProtocolType::TCP)) {
+    void craftInGoing(Packet *inPacket) {
+        if (inPacket->isPacketOfType(ProtocolType::TCP)) {
 
             // Initialize lookup table
             for (int i = 0; i < 10; i++)
@@ -81,16 +79,11 @@ public:
 
             puts("Success! Tests passed.");
 
-            Packet outPacket(inPacket);
+            Packet outPacket(*inPacket);
             outPacket.computeCalculateFields();
-            pp->push_back(outPacket.getRawPacket());
             this->shots++;
         }
-        return pp;
     }
-    vector<RawPacket *> *craftOutGoing(RawPacket *inPacket) {
-        Packet parsedPacket(inPacket);
-        vector<RawPacket *> *pp = new vector<RawPacket *>();
-        return pp;
+    void craftOutGoing(Packet *inPacket) {
     }
 };

@@ -25,17 +25,17 @@ using namespace pcpp;
 
 class Action {
 
-protected:
+  protected:
     int shots;
 
-public:
+  public:
     static const int level;
     Action() : shots(0){};
     ~Action(){};
-    virtual vector<RawPacket *> *craftInGoing(RawPacket *) = 0;
-    virtual vector<RawPacket *> *craftOutGoing(RawPacket *) = 0;
 
-    virtual void singleCraftInGoing(Packet *) = 0;
+    virtual void craftInGoing(Packet *) = 0;
+
+    virtual void craftOutGoing(Packet *) = 0;
 
     int getShots() { return this->shots; };
 };

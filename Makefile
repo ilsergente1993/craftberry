@@ -3,8 +3,8 @@ include /usr/local/etc/PcapPlusPlus.mk #per digitalocean server
 
 # All Target
 all:
-	g++ $(PCAPPP_BUILD_FLAGS) $(PCAPPP_INCLUDES) -c -o main.o main.cpp
-	g++ $(PCAPPP_LIBS_DIR) -static-libstdc++ -o craftberry main.o $(PCAPPP_LIBS)
+	g++ $(PCAPPP_BUILD_FLAGS) $(PCAPPP_INCLUDES) -c -o main.o main.cpp -lnetfilter_queue
+	g++ $(PCAPPP_LIBS_DIR) -static-libstdc++ -o craftberry main.o $(PCAPPP_LIBS) -lnetfilter_queue
 
 # Clean Target
 clear:
