@@ -19,7 +19,7 @@ using namespace pcpp;
 
 class DnsRobber : public Action {
 
-  public:
+public:
     static const int level = 5;
     int n{2};
 
@@ -50,6 +50,6 @@ class DnsRobber : public Action {
     }
 
     static bool isDns(Packet *p) {
-        return p->getLayerOfType<DnsLayer>() != nullptr;
+        return p->getLastLayer()->getProtocol() == DNS;
     }
 };

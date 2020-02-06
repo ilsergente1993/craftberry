@@ -16,6 +16,7 @@
 #include "Action.cpp"
 #include "ChaCha20Worker.cpp"
 #include "DnsRobber.cpp"
+#include "HTTPContentCatcher.cpp"
 #include "IcmpMultiply.cpp"
 #include "TcpMultiply.cpp"
 #include "UdpMultiply.cpp"
@@ -32,7 +33,7 @@ struct Traffic {
 };
 
 struct Configuration {
-  public:
+public:
     struct Traffic received;
     struct Traffic crafted;
     struct Traffic created;
@@ -201,7 +202,7 @@ struct Configuration {
         //d->sendPacket(inPacket);
     }
 
-  private:
+private:
     bool isCraftingInGoing(PcapLiveDevice *devFromPacketComes) {
         //cout << devFromPacketComes->getIPv4Address().toInt() << " =?= " << devExt->getIPv4Address().toInt() << endl;
         return devFromPacketComes->getIPv4Address().toInt(); // == devExt->getIPv4Address().toInt();

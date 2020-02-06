@@ -19,7 +19,7 @@ using namespace pcpp;
 
 class HTTPContentCatcher : public Action {
 
-  public:
+public:
     static const int level = 5;
     int n;
 
@@ -29,5 +29,19 @@ class HTTPContentCatcher : public Action {
     void craftInGoing(Packet *inPacket) {
     }
     void craftOutGoing(Packet *inPacket) {
+    }
+    void changeUrl(Packet *inPacket) {
+        cout << "url:     " << inPacket->getLayerOfType<HttpRequestLayer>()->getUrl() << endl;
+        HttpRequestLayer *http = inPacket->getLayerOfType<HttpRequestLayer>();
+        //http->getFirstLine()->setMethod(pcpp::HttpRequestLayer::HttpGET);
+        http->getFieldByName(PCPP_HTTP_HOST_FIELD)->setFieldValue("www.jafed.xyz");
+        http->getFirstLine()->setUri("/test.txt");
+        http->computeCalculateFields();
+        inPacket->computeCalculateFields();
+        cout << "new url: " << inPacket->getLayerOfType<HttpRequestLayer>()->getUrl() << endl;
+    }
+
+    static bool isHTTPRequest(Packet *p) {
+        return p->getLastLayer()->getProtocol() == HTTPRequest;
     }
 };

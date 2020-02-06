@@ -37,11 +37,18 @@ public:
     //     return pp;
     // }
 
+    void changeRequestData(Packet *inPacket) {
+        inPacket->removeLastLayer();
+        IcmpLayer *pingreq = new IcmpLayer();
+        //modifico l'id ed il numero di sequenza della richiesta
+        pingreq->setInfoRequestData(30, 47);
+        inPacket->addLayer(pingreq);
+    };
     void craftInGoing(Packet *inPacket) {
     }
     void craftOutGoing(Packet *inPacket) {
     }
     static bool isIcmp(Packet *p) {
-        return p->getLayerOfType<IcmpLayer>() != nullptr;
+        return p->getLastLayer()->getProtocol() == ICMP;
     }
 };

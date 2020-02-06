@@ -238,7 +238,6 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     //modifico il pacchetto
     if (false) {
         inPacket->getLayerOfType<pcpp::IPv4Layer>()->setDstIpAddress(IPv4Address("10.135.63.160"));
-        inPacket->computeCalculateFields();
 
         //DOC: accetto tutto il traffico che non è diretto al mio IP
         pcpp::IPv4Address ip("165.22.66.6");
@@ -255,18 +254,21 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
+    if (conf->method.compare("HTTP") == 0 && HTTPContentCatcher::isHTTPRequest(inPacket)) {
+        if (!verbose)
+            printAllLayers(inPacket);
+        HTTPContentCatcher *c = new HTTPContentCatcher();
+        c->changeUrl(inPacket);
+        return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
+    }
+
     if (conf->method.compare("ICMPMULTIPLY") == 0 && IcmpMultiply::isIcmp(inPacket)) {
         // pcpp::Packet *outPacket = new pcpp::Packet(*inPacket);
         // cout << "\tOUT: " << outPacket->getLastLayer()->toString() << endl;
-        inPacket->removeLastLayer();
-        IcmpLayer *pingreq = new IcmpLayer();
-        //modifico l'id ed il numero di sequenza della richiesta
-        pingreq->setInfoRequestData(3, 47);
-        // inPacket->getRawPacket()->getPacketTimeStamp().tv_sec,
-        // pingreq->getEchoRequestData()->data,
-        // pingreq->getEchoRequestData()->dataLength);
-        inPacket->addLayer(pingreq);
-        cout << "---"<< endl;
+        IcmpMultiply *action = new IcmpMultiply(2, 2);
+        action->changeRequestData(inPacket);
+
+        cout << "---" << endl;
         printAllLayers(inPacket);
 
         //cout << " -- pacchetto copiato" << endl;
@@ -403,10 +405,10 @@ int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
     return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
 }
 int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
-    int len = p->getRawPacket()->getRawDataLen();
-    const uint8_t *data = p->getRawPacket()->getRawData();
-    delete p;
-    return nfq_set_verdict(qh, id, NF_ACCEPT, len, data);
+    conf->crafted.packets++;
+    conf->crafted.bytes += p->getRawPacket()->getRawDataLen();
+    p->computeCalculateFields();
+    return nfq_set_verdict(qh, id, NF_ACCEPT, p->getRawPacket()->getRawDataLen(), p->getRawPacket()->getRawData());
 }
 
 void makeIptableCmd(bool isDeleting) {
