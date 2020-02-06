@@ -57,13 +57,14 @@ using namespace std;
 using namespace pcpp;
 
 //DOC: struct storaging the usage options for the CLI
-const char *const CraftberryOptionsShort = "I:a:t:l:d:h";
+const char *const CraftberryOptionsShort = "I:a:t:l:d:hv";
 static struct option CraftberryOptions[] =
     {{"tun0_interface", required_argument, 0, 'I'},
      {"action", required_argument, 0, 'a'},
      {"timeout", required_argument, 0, 't'},
      {"log", required_argument, 0, 'l'},
      {"direction", required_argument, 0, 'd'},
+     {"verbose", no_argument, 0, 'v'},
      {"help", no_argument, 0, 'h'},
      {0, 0, 0, 0}};
 
@@ -71,18 +72,19 @@ void ctrl_c(int);
 void help();
 void listInterfaces();
 void printAllLayers(pcpp::Packet *p);
-static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 bool sendPkt(RawPacket *p, PcapLiveDevice *destination);
 void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination);
 void quitCraftberry();
 void makeIptableCmd(bool);
 int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
 int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
+static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 
 //DOC: global vars
 struct Configuration *conf = nullptr;
 struct nfq_q_handle *queue = nullptr;
 struct nfq_handle *handler = nullptr;
+bool verbose = false;
 
 //DOC: handler function to manage external signals
 void ctrl_c(int s) {
@@ -136,6 +138,9 @@ int main(int argc, char *argv[]) {
         case 'l':
             if (strcmp(optarg, "default") != 0)
                 (logName = optarg) += ".pcapng";
+            break;
+        case 'v':
+            verbose = true;
             break;
         case 'd':
             if (strcmp(&optarg[0], "IN") == 0)
@@ -226,7 +231,8 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
 
     //DOC: scrollo i pacchetti per inspezione
     DEBUG("[#" << conf->received.packets << "] -> " << inPacket->getLastLayer()->toString() << endl);
-    printAllLayers(inPacket);
+    if (verbose)
+        printAllLayers(inPacket);
 
     //modifico il pacchetto
     if (false) {
@@ -320,28 +326,26 @@ void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination) {
 void help() {
     cout << "\nUsage: Craftberry options:\n"
             "-------------------------\n"
-            " -A interface_src -B interface_dst\n"
+            "craftberry -I tun0_interface -a [ ATTACK | DEFENSE ]\n"
             "Options:\n"
-            "    -A            : Use the specified source interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
-            "    -B            : Use the specified destination interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
+            "    -I            : Use the specified interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
             "    -a            : Use the specified action\n"
             "    -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)\n"
-            "    -l            : Write the output stream sent to the destination interface into a pcapng file having name passed by parameter or, if the parameter's equal to 'default', the name is 'out_<epoch_ms>'\n"
-            "    -i            : Print the list of interfaces and exists\n"
-            "    -d            : Set the flow direction where to perform the action. Both direction is the default value.\n"
+            "    -l            : Write all the crafted and generated traffic into a pcapng file having name passed by parameter or, if the parameter\'s equal to \'default\', the name is `out_<epoch_ms>.pcapng`\n"
+            "    -d            : Direction filtering by and perform the crafting {IN, OUT}, default = IN\n"
+            "    -v            : Shows verbose debug application logs\n"
             "    -h            : Displays this help message and exits\n"
             "Actions:\n"
             "   - default:\n"
-            "       BEQUITE    : just replying all the traffic from src to dst\n"
+            "       BEQUITE    : just sniffing all the traffic\n"
             "   - ATTACK:\n"
-            "       DNS        : catch the DNS queries and replace its value\n"
-            "       HTTP       : description\n"
-            "       HTTPIMAGE  : description\n"
-            "       TCPMULTIPY : multiply N times every tcp packet to dst\n"
-            "       UDPMULTIPY : multiply N times every udp packet to dst\n"
-            "       ICMPMULTIPY: multiply N times every icmp packet to dst\n"
+            "       DNS        : catch the DNS packets and replace (IN) the query\'s value or (OUT) the answer value\n"
+            "       HTTP       : TODO\n"
+            "       TCPMULTIPY : multiply N times every tcp packet to dst (IN, OUT)\n"
+            "       UDPMULTIPY : multiply N times every udp packet to dst (IN, OUT)\n"
+            "       ICMPMULTIPY: multiply N times every icmp packet to dst (IN, OUT)\n"
             "   - DEFENSE:\n"
-            "       CHACHA20   : encrypt all the outgoing traffic and decrypt all the ingoing traffic\n";
+            "       CHACHA20   : encrypt all the outgoing traffic (OUT) or decrypt all the ingoing traffic (IN)\n";
     exit(0);
 }
 
@@ -368,7 +372,7 @@ int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
 void makeIptableCmd(bool isDeleting) {
     string protocol = "";
     if (conf->method.compare("BEQUITE") == 0) {
-        protocol = "all"; //TODO: cambiare
+        protocol = "all";
     } else if (conf->method.compare("DNSROBBER") == 0) {
         protocol = "udp port 53";
     } else if (conf->method.compare("ICMP") == 0) {
@@ -386,17 +390,7 @@ void makeIptableCmd(bool isDeleting) {
                   (conf->direction == 0 ? "INPUT "s : "OUTPUT "s) +
                   "-p "s + protocol + " -j NFQUEUE "s +
                   " --queue-num "s + dir);
-    /*cmd += ("\nsudo iptables -t filter "s +
-            (!isDeleting ? "-I "s : "-D "s) +
-            (conf->direction == 0 ? "OUTPUT "s : "POSTROUTING "s) +
-            "-p "s + protocol + " -j NFQUEUE "s +
-            " --queue-num "s + dir);*/
-    /*cmd += ("\nsudo iptables -t filter "s +
-            (!isDeleting ? "-I "s : "-D "s) +
-            (conf->direction == 0 ? "INPUT "s : "POSTROUTING "s) +
-            "-p "s + protocol + " -j NFQUEUE "s
-            /*" --queue-num "s + dir);*/
     cout << "IPTABLE RULE: " << endl
-         << "\t#" << cmd << endl;
+         << "\t$: " << cmd << endl;
     system(("\n#/bin/bash\n\n"s + cmd).c_str());
 };

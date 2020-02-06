@@ -13,6 +13,7 @@ Options:
     -t            : Use the specified timeout in seconds, if not defined it runs until some external signals stop the execution (e.g. ctrl+c)
     -l            : Write all the crafted and generated traffic into a pcapng file having name passed by parameter or, if the parameter\'s equal to \'default\', the name is `out_<epoch_ms>.pcapng`
     -d            : Direction filtering by and perform the crafting {IN, OUT}, default = IN
+    -v            : Shows verbose debug application logs
     -h            : Displays this help message and exits
 
 Actions:
