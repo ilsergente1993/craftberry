@@ -42,17 +42,6 @@ extern "C" {
 
 #include "Configuration.cpp"
 
-#define ASSERT(x, m, f)        \
-    do {                       \
-        if ((x)) {             \
-            cerr << m << endl; \
-            f;                 \
-        }                      \
-    } while (false);
-
-#define CHECK(x, m) \
-    ASSERT(x, m, nullptr)
-
 using namespace std;
 using namespace pcpp;
 
@@ -81,11 +70,6 @@ int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
 int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
 static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 
-//DOC: global vars
-struct Configuration *conf = nullptr;
-struct nfq_q_handle *queue = nullptr;
-struct nfq_handle *handler = nullptr;
-bool verbose = false;
 
 //DOC: handler function to manage external signals
 void ctrl_c(int s) {
@@ -235,37 +219,35 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     if (verbose)
         printAllLayers(inPacket);
 
-    //modifico il pacchetto
-    if (false) {
-        inPacket->getLayerOfType<pcpp::IPv4Layer>()->setDstIpAddress(IPv4Address("10.135.63.160"));
-
-        //DOC: accetto tutto il traffico che non è diretto al mio IP
-        pcpp::IPv4Address ip("165.22.66.6");
-        if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
-            return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
-        }
-    }
-
     if (conf->method.compare("BEQUITE") == 0) {
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("ICMP") == 0 && IcmpMultiply::isIcmp(inPacket)) {
+    if (conf->method.compare("ICMP") == 0 && Action::Icmp::isProto(inPacket)) {
+        return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
+    }
+    if (conf->method.compare("IPV4") == 0 && Action::Icmp::isProto(inPacket)) {
+        if (!verbose)
+            printAllLayers(inPacket);
+        Action::IPv4 *ip = new Action::IPv4(1);
+        ip->changeDst(inPacket);
+        if (!verbose)
+            printAllLayers(inPacket);
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("HTTP") == 0 && HTTPContentCatcher::isHTTPRequest(inPacket)) {
+    if (conf->method.compare("HTTP") == 0 && Action::HTTP::isProto(inPacket)) {
         if (!verbose)
             printAllLayers(inPacket);
-        HTTPContentCatcher *c = new HTTPContentCatcher();
+        Action::HTTP *c = new Action::HTTP();
         c->changeUrl(inPacket);
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("ICMPMULTIPLY") == 0 && IcmpMultiply::isIcmp(inPacket)) {
+    if (conf->method.compare("ICMPMULTIPLY") == 0 && Action::Icmp::isProto(inPacket)) {
         // pcpp::Packet *outPacket = new pcpp::Packet(*inPacket);
         // cout << "\tOUT: " << outPacket->getLastLayer()->toString() << endl;
-        IcmpMultiply *action = new IcmpMultiply(2, 2);
+        Action::Icmp *action = new Action::Icmp(2, 2);
         action->changeRequestData(inPacket);
 
         cout << "---" << endl;
@@ -279,10 +261,10 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("DNSROBBER") == 0 && DnsRobber::isDns(inPacket)) {
-        DnsRobber action;
+    if (conf->method.compare("DNSROBBER") == 0 && Action::Dns::isProto(inPacket)) {
+        Action::Dns action;
         //Packet *p;
-        action.craftInGoing(inPacket);
+        action.changeRequest(inPacket);
         //ASSERT(, "DNSROBBER failed for some reason", exit(1));
         //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, nullptr);
         //printAllLayers(p);
@@ -295,144 +277,8 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_DROP, 0, NULL);
         return verdict_accept(qh, ntohl(ph->packet_id), outPacket);
     }
-
-    //TODO: per copia ed invio del pacchetto
-    if (false) {
-        //DOC: creo e riempio il secondo pacchetto
-        pcpp::RawPacket *outPacketRaw = new pcpp::RawPacket();
-        outPacketRaw->setRawData(inPacket->getRawPacket()->getRawData(), inPacket->getRawPacket()->getRawDataLen(), timestamp);
-        pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
-
-        cout << "OUT: " << outPacket->getLastLayer()->toString() << endl;
-        if (verbose)
-            printAllLayers(outPacket);
-
-        //cout << " -- pacchetto copiato" << endl;
-        CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
-        CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
-        CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
-
-        DEBUG(" -- pacchetto inviato a (" << conf->devTun0->getName() << ") " << conf->devTun0->getIPv4Address().toString() << endl);
-    }
+    //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
 
     //DOC: invio il verdetto
     return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
 }
-
-bool sendPkt(const uint8_t *packetData, int packetDataLength) {
-    if (packetDataLength > conf->devTun0->getMtu()) {
-        conf->dropped.packets++;
-        conf->dropped.bytes += packetDataLength;
-        return false;
-    }
-    if (conf->devTun0->sendPacket(packetData, packetDataLength)) {
-        conf->created.packets++;
-        conf->created.bytes += packetDataLength;
-        //conf->devLogFile->writePacket(*p); //TODO:
-        return true;
-    }
-    cout << "something strange did just happen" << endl;
-    return false;
-};
-
-bool sendPkt(RawPacket *p) {
-    if (p->getRawDataLen() > conf->devTun0->getMtu()) {
-        conf->dropped.packets++;
-        conf->dropped.bytes += p->getRawDataLen();
-        return false;
-    }
-    if (conf->devTun0->sendPacket(*p)) {
-        conf->created.packets++;
-        conf->created.bytes += p->getRawDataLen();
-        conf->devLogFile->writePacket(*p);
-        return true;
-    }
-    cout << "something strange did just happen" << endl;
-    return false;
-};
-
-void sendPkt(vector<RawPacket *> *pToSend) {
-    int cont = 0;
-    double size = 0;
-    for (auto p : *pToSend) {
-        if (!sendPkt(p)) {
-            cout << "1 packet skipped" << endl;
-        } else {
-            cont++;
-            size += p->getRawDataLen();
-        }
-    }
-    DEBUG(" └> " << cont << " packets (" << size << " B) to " << conf->devTun0->getIPv4Address().toString() << endl);
-};
-
-void help() {
-    cout << "\nUsage: Craftberry options:\n"
-            "-------------------------\n"
-            "craftberry -I tun0_interface -a [ ATTACK | DEFENSE ]\n"
-            "Options:\n"
-            "    -I            : Use the specified interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
-            "    -a            : Use the specified action\n"
-            "    -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)\n"
-            "    -l            : Write all the crafted and generated traffic into a pcapng file having name passed by parameter or, if the parameter\'s equal to \'default\', the name is `out_<epoch_ms>.pcapng`\n"
-            "    -d            : Direction filtering by and perform the crafting {IN, OUT}, default = IN\n"
-            "    -v            : Shows verbose debug application logs\n"
-            "    -h            : Displays this help message and exits\n"
-            "Actions:\n"
-            "   - default:\n"
-            "       BEQUITE    : just sniffing all the traffic\n"
-            "   - ATTACK:\n"
-            "       DNS        : catch the DNS packets and replace (IN) the query\'s value or (OUT) the answer value\n"
-            "       HTTP       : TODO\n"
-            "       TCPMULTIPY : multiply N times every tcp packet to dst (IN, OUT)\n"
-            "       UDPMULTIPY : multiply N times every udp packet to dst (IN, OUT)\n"
-            "       ICMPMULTIPY: multiply N times every icmp packet to dst (IN, OUT)\n"
-            "   - DEFENSE:\n"
-            "       CHACHA20   : encrypt all the outgoing traffic (OUT) or decrypt all the ingoing traffic (IN)\n";
-    exit(0);
-}
-
-void printAllLayers(pcpp::Packet *p) {
-    pcpp::Layer *L = p->getFirstLayer();
-    while (L != nullptr) {
-        cout << "\t\t| LEV: " << L->getOsiModelLayer() << " => " << L->toString() << endl;
-        L = L->getNextLayer();
-    }
-}
-
-int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
-    conf->dropped.packets++;
-    conf->dropped.bytes += p->getRawPacket()->getRawDataLen();
-    return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
-}
-int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
-    conf->crafted.packets++;
-    conf->crafted.bytes += p->getRawPacket()->getRawDataLen();
-    p->computeCalculateFields();
-    return nfq_set_verdict(qh, id, NF_ACCEPT, p->getRawPacket()->getRawDataLen(), p->getRawPacket()->getRawData());
-}
-
-void makeIptableCmd(bool isDeleting) {
-    string protocol = "";
-    if (conf->method.compare("BEQUITE") == 0) {
-        protocol = "all";
-    } else if (conf->method.compare("DNSROBBER") == 0) {
-        protocol = "udp port 53";
-    } else if (conf->method.compare("ICMP") == 0 || conf->method.compare("ICMPMULTIPLY") == 0) {
-        protocol = "icmp";
-    } else if (conf->method.compare("UDPMULTIPLY") == 0) {
-        protocol = "udp";
-    } else if (conf->method.compare("TCPMULTIPLY") == 0) {
-        protocol = "tcp";
-    } else if (conf->method.compare("HTTP") == 0) {
-        protocol = "tcp -m multiport --dports 80,443";
-    }
-    string dir = std::to_string(static_cast<std::underlying_type<Direction>::type>(conf->direction));
-    string cmd = ("sudo iptables -t filter "s +
-                  (!isDeleting ? "-I "s : "-D "s) +
-                  (conf->direction == 0 ? "INPUT "s : "OUTPUT "s) +
-                  "-p "s + protocol + " -j NFQUEUE "s +
-                  " --queue-num "s + dir);
-    cout << "IPTABLE RULE: " << endl
-         << "\t$: " << cmd << endl;
-    system(("\n#/bin/bash\n\n"s + cmd).c_str());
-};

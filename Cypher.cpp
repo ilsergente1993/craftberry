@@ -1,4 +1,3 @@
-#include "Action.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -19,18 +18,16 @@
 using namespace std;
 using namespace pcpp;
 
-class ChaCha20Worker : public Action {
+namespace Action {
+class Cypher {
 
-  public:
-    static const int level = 4; //TODO: 4.5?
-    int n;
+public:
+    static const int level = 5;
 
-    int counter{0};
-
-    ChaCha20Worker() : n(0){};
-    ~ChaCha20Worker(){};
-
-    void craftInGoing(Packet *inPacket) {
+    Cypher();
+    ~Cypher();
+    
+    void ChaCha20(Packet *inPacket) {
         if (inPacket->isPacketOfType(ProtocolType::TCP)) {
 
             // Initialize lookup table
@@ -81,9 +78,7 @@ class ChaCha20Worker : public Action {
 
             Packet outPacket(*inPacket);
             outPacket.computeCalculateFields();
-            this->shots++;
         }
     }
-    void craftOutGoing(Packet *inPacket) {
-    }
 };
+} // namespace Action

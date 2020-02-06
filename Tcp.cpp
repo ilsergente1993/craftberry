@@ -1,4 +1,3 @@
-#include "Action.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -17,14 +16,15 @@
 using namespace std;
 using namespace pcpp;
 
-class TcpMultiply : public Action {
+namespace Action {
+class Tcp {
 
-  public:
+public:
     static const int level = 4;
     int n;
 
-    TcpMultiply(int _n) : n(_n){};
-    ~TcpMultiply(){};
+    Tcp(int _n) : n(_n){};
+    ~Tcp(){};
     // vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
     //     Packet parsedPacket(inPacket);
     //     vector<RawPacket *> *pp = new vector<RawPacket *>();
@@ -36,9 +36,5 @@ class TcpMultiply : public Action {
     //     }
     //     return pp;
     // }
-
-    void craftInGoing(Packet *inPacket) {
-    }
-    void craftOutGoing(Packet *inPacket) {
-    }
 };
+} // namespace Action

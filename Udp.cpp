@@ -1,4 +1,3 @@
-#include "Action.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -17,14 +16,15 @@
 using namespace std;
 using namespace pcpp;
 
-class UdpMultiply : public Action {
+namespace Action {
+class Udp {
 
-  public:
+public:
     static const int level = 4;
     int n;
 
-    UdpMultiply(int _n) : n(_n){};
-    ~UdpMultiply(){};
+    Udp(int _n) : n(_n){};
+    ~Udp(){};
     // vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
     //     Packet parsedPacket(inPacket);
     //     vector<RawPacket *> *pp = new vector<RawPacket *>();
@@ -36,8 +36,5 @@ class UdpMultiply : public Action {
     //     }
     //     return pp;
     // }
-    void craftInGoing(Packet *inPacket) {
-    }
-    void craftOutGoing(Packet *inPacket) {
-    }
 };
+} // namespace Action

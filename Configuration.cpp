@@ -13,16 +13,38 @@
 #include <iostream>
 #include <stdlib.h>
 
-#include "Action.cpp"
-#include "ChaCha20Worker.cpp"
-#include "DnsRobber.cpp"
-#include "HTTPContentCatcher.cpp"
-#include "IcmpMultiply.cpp"
-#include "TcpMultiply.cpp"
-#include "UdpMultiply.cpp"
+#include "Cypher.cpp"
+#include "Dns.cpp"
+#include "Http.cpp"
+#include "Icmp.cpp"
+#include "Ipv4.cpp"
+#include "Tcp.cpp"
+#include "Udp.cpp"
+
+#define DEBUG(x)                \
+    do {                        \
+        std::cerr << "\t" << x; \
+    } while (0);
+
+#define ASSERT(x, m, f)        \
+    do {                       \
+        if ((x)) {             \
+            cerr << m << endl; \
+            f;                 \
+        }                      \
+    } while (false);
+
+#define CHECK(x, m) \
+    ASSERT(x, m, nullptr)
 
 using namespace std;
 using namespace pcpp;
+
+//DOC: global vars
+struct Configuration *conf = nullptr;
+struct nfq_q_handle *queue = nullptr;
+struct nfq_handle *handler = nullptr;
+bool verbose = false;
 
 enum PacketDirection { InGoing = 0,
                        OutGoing = 1 };
@@ -124,91 +146,122 @@ public:
         cerr << "in file: received:" << stats.ps_recv << ", "
              << "dropped:" << stats.ps_drop << endl;*/
     };
+};
 
-    static void callback(RawPacket *inPacket, PcapLiveDevice *localDevInt, void *_conf) {
-        //DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-        vector<RawPacket *> *pToSend;
-        Configuration *conf = (Configuration *)_conf;
-        conf->received.bytes += inPacket->getRawDataLen();
-        conf->received.packets++;
-        if (conf->method.compare("BEQUITE") == 0) {
-            //DOC: just forwarding everything
-            DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-            vector<RawPacket *> *pp = new vector<RawPacket *>();
-            pp->push_back(inPacket);
-            //d->sendPackets(pp);
-            return;
-        }
-        /*
-        if (conf->method.compare("TCPMULTIPLY") == 0) {
-            if (!conf->isCraftingOutGoing(localDevInt))
-                return;
-            TcpMultiply action(3);
-            pToSend = action.craftOutGoing(inPacket);
-            if (pToSend->size() > 0) {
-                DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-                //d->sendPackets(pToSend);
-            }
-            return;
-        }
+void help() {
+    cout << "\nUsage: Craftberry options:\n"
+            "-------------------------\n"
+            "craftberry -I tun0_interface -a [ ATTACK | DEFENSE ]\n"
+            "Options:\n"
+            "    -I            : Use the specified interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
+            "    -a            : Use the specified action\n"
+            "    -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)\n"
+            "    -l            : Write all the crafted and generated traffic into a pcapng file having name passed by parameter or, if the parameter\'s equal to \'default\', the name is `out_<epoch_ms>.pcapng`\n"
+            "    -d            : Direction filtering by and perform the crafting {IN, OUT}, default = IN\n"
+            "    -v            : Shows verbose debug application logs\n"
+            "    -h            : Displays this help message and exits\n"
+            "Actions:\n"
+            "   - default:\n"
+            "       BEQUITE    : just sniffing all the traffic\n"
+            "   - ATTACK:\n"
+            "       DNS        : catch the DNS packets and replace (IN) the query\'s value or (OUT) the answer value\n"
+            "       HTTP       : TODO\n"
+            "       TCPMULTIPY : multiply N times every tcp packet to dst (IN, OUT)\n"
+            "       UDPMULTIPY : multiply N times every udp packet to dst (IN, OUT)\n"
+            "       ICMPMULTIPY: multiply N times every icmp packet to dst (IN, OUT)\n"
+            "   - DEFENSE:\n"
+            "       CHACHA20   : encrypt all the outgoing traffic (OUT) or decrypt all the ingoing traffic (IN)\n";
+    exit(0);
+}
 
-        if (conf->method.compare("UDPMULTIPLY") == 0) {
-            UdpMultiply action(3);
-            pToSend = action.craftOutGoing(inPacket);
-            if (pToSend->size() > 0) {
-                DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-                cout << pToSend->size() << endl;
-                //d->sendPackets(pToSend);
-            }
-            return;
-        }
-
-        if (conf->method.compare("CHACHA20") == 0) {
-            DEBUG("-> 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-
-            ChaCha20Worker action;
-            pToSend = action.craftOutGoing(inPacket);
-            if (pToSend->size() > 0) {
-                //d->sendPackets(pToSend);
-            }
-            return;
-        }
-
-        if (conf->method.compare("ICMPMULTIPLY") == 0) {
-            IcmpMultiply action(2, 3);
-            if (conf->isCraftingInGoing(localDevInt)) {
-                pToSend = action.craftInGoing(inPacket);
-                if (pToSend->size() > 0) {
-                    DEBUG("-> 1 in packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-                    //cout << pToSend->size() << endl;
-                    //d->sendPackets(pToSend, d->devInt);
-                }
-            }
-            if (conf->isCraftingOutGoing(localDevInt)) {
-                pToSend = action.craftOutGoing(inPacket);
-                if (pToSend->size() > 0) {
-                    DEBUG("-> 1 out packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-                    //cout << pToSend->size() << endl;
-                    //d->sendPackets(pToSend, d->devExt);
-                }
-            }
-            return;
-        }
-*/
-        //se non è nessuno dei precedenti cmq rimbalzo tutto
-        //DEBUG("<- 1 packet (" << inPacket->getRawDataLen() << " B) from dev " << localDevInt->getIPv4Address().toString() << endl);
-        //modalità solo protocollo interessato?!?!?!?!?!?!?
-        //senza di questo potrei non riuscire a tenere la comunicazione perchè tolgo pacchetti di servizio
-        //d->sendPacket(inPacket);
+bool sendPkt(const uint8_t *packetData, int packetDataLength) {
+    if (packetDataLength > conf->devTun0->getMtu()) {
+        conf->dropped.packets++;
+        conf->dropped.bytes += packetDataLength;
+        return false;
     }
+    if (conf->devTun0->sendPacket(packetData, packetDataLength)) {
+        conf->created.packets++;
+        conf->created.bytes += packetDataLength;
+        //conf->devLogFile->writePacket(*p); //TODO:
+        return true;
+    }
+    cout << "something strange did just happen" << endl;
+    return false;
+};
 
-private:
-    bool isCraftingInGoing(PcapLiveDevice *devFromPacketComes) {
-        //cout << devFromPacketComes->getIPv4Address().toInt() << " =?= " << devExt->getIPv4Address().toInt() << endl;
-        return devFromPacketComes->getIPv4Address().toInt(); // == devExt->getIPv4Address().toInt();
+bool sendPkt(RawPacket *p) {
+    if (p->getRawDataLen() > conf->devTun0->getMtu()) {
+        conf->dropped.packets++;
+        conf->dropped.bytes += p->getRawDataLen();
+        return false;
     }
-    bool isCraftingOutGoing(PcapLiveDevice *devFromPacketComes) {
-        //cout << devFromPacketComes->getIPv4Address().toInt() << " =?= " << devInt->getIPv4Address().toInt() << endl;
-        return devFromPacketComes->getIPv4Address().toInt(); // == devInt->getIPv4Address().toInt();
+    if (conf->devTun0->sendPacket(*p)) {
+        conf->created.packets++;
+        conf->created.bytes += p->getRawDataLen();
+        conf->devLogFile->writePacket(*p);
+        return true;
     }
+    cout << "something strange did just happen" << endl;
+    return false;
+};
+
+void sendPkt(vector<RawPacket *> *pToSend) {
+    int cont = 0;
+    double size = 0;
+    for (auto p : *pToSend) {
+        if (!sendPkt(p)) {
+            cout << "1 packet skipped" << endl;
+        } else {
+            cont++;
+            size += p->getRawDataLen();
+        }
+    }
+    DEBUG(" └> " << cont << " packets (" << size << " B) to " << conf->devTun0->getIPv4Address().toString() << endl);
+};
+
+void printAllLayers(pcpp::Packet *p) {
+    pcpp::Layer *L = p->getFirstLayer();
+    while (L != nullptr) {
+        cout << "\t\t| LEV: " << L->getOsiModelLayer() << " => " << L->toString() << endl;
+        L = L->getNextLayer();
+    }
+}
+
+int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
+    conf->dropped.packets++;
+    conf->dropped.bytes += p->getRawPacket()->getRawDataLen();
+    return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+}
+int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
+    conf->crafted.packets++;
+    conf->crafted.bytes += p->getRawPacket()->getRawDataLen();
+    p->computeCalculateFields();
+    return nfq_set_verdict(qh, id, NF_ACCEPT, p->getRawPacket()->getRawDataLen(), p->getRawPacket()->getRawData());
+}
+
+void makeIptableCmd(bool isDeleting) {
+    string protocol = "";
+    if (conf->method.compare("BEQUITE") == 0) {
+        protocol = "all";
+    } else if (conf->method.compare("DNSROBBER") == 0) {
+        protocol = "udp port 53";
+    } else if (conf->method.compare("ICMP") == 0 || conf->method.compare("ICMPMULTIPLY") == 0 || conf->method.compare("IPV4") == 0) {
+        protocol = "icmp";
+    } else if (conf->method.compare("UDPMULTIPLY") == 0) {
+        protocol = "udp";
+    } else if (conf->method.compare("TCPMULTIPLY") == 0 || conf->method.compare("IPV4") == 0) {
+        protocol = "tcp";
+    } else if (conf->method.compare("HTTP") == 0) {
+        protocol = "tcp -m multiport --dports 80,443";
+    }
+    string dir = std::to_string(static_cast<std::underlying_type<Direction>::type>(conf->direction));
+    string cmd = ("sudo iptables -t filter "s +
+                  (!isDeleting ? "-I "s : "-D "s) +
+                  (conf->direction == 0 ? "INPUT "s : "OUTPUT "s) +
+                  "-p "s + protocol + " -j NFQUEUE "s +
+                  " --queue-num "s + dir);
+    cout << "IPTABLE RULE: " << endl
+         << "\t$: " << cmd << endl;
+    system(("\n#/bin/bash\n\n"s + cmd).c_str());
 };

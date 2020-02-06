@@ -1,4 +1,3 @@
-#include "Action.cpp"
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -17,14 +16,15 @@
 using namespace std;
 using namespace pcpp;
 
-class IcmpMultiply : public Action {
+namespace Action {
+class Icmp {
 
 public:
     static const int level = 4; //TODO: ??
     int nIn, nOut;
 
-    IcmpMultiply(int _nIn, int _nOut) : nIn(_nIn), nOut(_nOut){};
-    ~IcmpMultiply(){};
+    Icmp(int _nIn, int _nOut) : nIn(_nIn), nOut(_nOut){};
+    ~Icmp(){};
     // vector<RawPacket *> *craftInGoing(RawPacket *inPacket) {
     //     Packet parsedPacket(inPacket);
     //     vector<RawPacket *> *pp = new vector<RawPacket *>();
@@ -48,7 +48,8 @@ public:
     }
     void craftOutGoing(Packet *inPacket) {
     }
-    static bool isIcmp(Packet *p) {
-        return p->getLastLayer()->getProtocol() == ICMP;
+    static bool isProto(Packet *p) {
+        return p->getLastLayer()->getProtocol() == pcpp::ICMP;
     }
 };
+} // namespace Action

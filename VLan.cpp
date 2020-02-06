@@ -1,5 +1,3 @@
-//DOC: abstract class parent of every single action implementation
-#pragma once
 #include "fstream"
 #include "iostream"
 #include "pcapplusplus/DnsLayer.h"
@@ -15,27 +13,17 @@
 #include "stdlib.h"
 #include "string.h"
 
-#define DEBUG(x)                \
-    do {                        \
-        std::cerr << "\t" << x; \
-    } while (0);
-
 using namespace std;
 using namespace pcpp;
 
-class Action {
+namespace Action {
+class VLan {
 
-  protected:
-    int shots;
+public:
+    static const int level = 2;
+    int n;
 
-  public:
-    static const int level;
-    Action() : shots(0){};
-    ~Action(){};
-
-    virtual void craftInGoing(Packet *) = 0;
-
-    virtual void craftOutGoing(Packet *) = 0;
-
-    int getShots() { return this->shots; };
+    VLan() : n(0){};
+    ~VLan(){};
 };
+} // namespace Action
