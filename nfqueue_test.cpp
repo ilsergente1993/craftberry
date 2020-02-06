@@ -76,7 +76,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     unsigned char *rawData = nullptr;
     int len = nfq_get_payload(nfa, &rawData);
     CHECK(len < 0, "Can\'t get payload data");
-
+    return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
     struct timeval timestamp;
     nfq_get_timestamp(nfa, &timestamp);
 
