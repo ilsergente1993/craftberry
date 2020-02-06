@@ -23,8 +23,8 @@
 using namespace std;
 using namespace pcpp;
 
-enum PacketDirection { InGoing = 1,
-                       OutGoing = 2 };
+enum PacketDirection { InGoing = 0,
+                       OutGoing = 1 };
 
 struct Traffic {
     double bytes = 0;

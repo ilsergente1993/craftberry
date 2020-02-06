@@ -53,9 +53,6 @@ extern "C" {
 #define CHECK(x, m) \
     ASSERT(x, m, nullptr)
 
-#define IPTABLES(s) \
-    system(s);
-
 using namespace std;
 using namespace pcpp;
 
@@ -79,6 +76,8 @@ bool sendPkt(RawPacket *p, PcapLiveDevice *destination);
 void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination);
 void quitCraftberry();
 void makeIptableCmd(bool);
+int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
+int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
 
 //DOC: global vars
 struct Configuration *conf = nullptr;
@@ -221,31 +220,32 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     // pcpp::EthLayer *newEthernetLayer = new pcpp::EthLayer(pcpp::MacAddress("f0:4b:3a:4f:80:30"), pcpp::MacAddress("a2:ee:e9:dd:4c:14"));
     // inPacket->insertLayer(nullptr, newEthernetLayer, true);
     inPacket->computeCalculateFields();
-    //pcpp::IPv4Address ip("165.22.66.6");
 
     conf->received.bytes += inPacketRaw->getRawDataLen();
     conf->received.packets++;
 
-    //DOC: scrorro i pacchetti per inspezione
+    //DOC: scrollo i pacchetti per inspezione
     DEBUG("[#" << conf->received.packets << "] -> " << inPacket->getLastLayer()->toString() << endl);
     printAllLayers(inPacket);
 
-    //modifico
-    //inPacket->getLayerOfType<pcpp::IPv4Layer>()->setDstIpAddress(IPv4Address("10.135.63.160"));
-    //inPacket->computeCalculateFields();
+    //modifico il pacchetto
+    if (false) {
+        inPacket->getLayerOfType<pcpp::IPv4Layer>()->setDstIpAddress(IPv4Address("10.135.63.160"));
+        inPacket->computeCalculateFields();
 
-    //    inPacket->getRawPacket()->getRawDataLen(),
-    //    inPacket->getRawPacket()->getRawData());
+        //DOC: accetto tutto il traffico che non è diretto al mio IP
+        pcpp::IPv4Address ip("165.22.66.6");
+        if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
+            return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
+        }
+    }
 
-    /*//DOC: accetto tutto il traffico che non è diretto al mio IP
-    pcpp::IPv4Address ip("165.22.66.6");
-    if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
-        return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
-    }*/
-
-    vector<RawPacket *> *pToSend;
     if (conf->method.compare("BEQUITE") == 0) {
-        return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
+        return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
+    }
+
+    if (conf->method.compare("ICMP") == 0) {
+        return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
     if (conf->method.compare("DNSROBBER") == 0 && DnsRobber::isDns(inPacket)) {
@@ -261,8 +261,8 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
 
         CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
-        return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_DROP, 0, NULL);
-        //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, len, (unsigned char *)rawData);
+        //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_DROP, 0, NULL);
+        return verdict_accept(qh, ntohl(ph->packet_id), outPacket);
     }
 
     //TODO: per copia ed invio del pacchetto
@@ -353,10 +353,22 @@ void printAllLayers(pcpp::Packet *p) {
     }
 }
 
+int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
+    conf->dropped.packets++;
+    conf->dropped.bytes += p->getRawPacket()->getRawDataLen();
+    return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+}
+int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
+    int len = p->getRawPacket()->getRawDataLen();
+    const uint8_t *data = p->getRawPacket()->getRawData();
+    delete p;
+    return nfq_set_verdict(qh, id, NF_ACCEPT, len, data);
+}
+
 void makeIptableCmd(bool isDeleting) {
     string protocol = "";
     if (conf->method.compare("BEQUITE") == 0) {
-        protocol = "icmp"; //TODO: cambiare
+        protocol = "all"; //TODO: cambiare
     } else if (conf->method.compare("DNSROBBER") == 0) {
         protocol = "udp port 53";
     } else if (conf->method.compare("ICMP") == 0) {
@@ -368,11 +380,23 @@ void makeIptableCmd(bool isDeleting) {
     } else if (conf->method.compare("HTTP") == 0) {
         protocol = "tcp -m multiport --dports 80,443";
     }
-    string cmd = ("sudo iptables -t nat "s +
+    string dir = std::to_string(static_cast<std::underlying_type<Direction>::type>(conf->direction));
+    string cmd = ("sudo iptables -t filter "s +
                   (!isDeleting ? "-I "s : "-D "s) +
-                  (conf->direction == 1 ? "INPUT "s : "POSTROUTING "s) +
+                  (conf->direction == 0 ? "INPUT "s : "OUTPUT "s) +
                   "-p "s + protocol + " -j NFQUEUE "s +
-                  " --queue-num "s + (conf->direction == 1 ? "1"s : "2"s));
-    cout << "IPTABLE RULE: " << cmd << endl;
-    IPTABLES(("\n#/bin/bash\n\n"s + cmd).c_str());
+                  " --queue-num "s + dir);
+    /*cmd += ("\nsudo iptables -t filter "s +
+            (!isDeleting ? "-I "s : "-D "s) +
+            (conf->direction == 0 ? "OUTPUT "s : "POSTROUTING "s) +
+            "-p "s + protocol + " -j NFQUEUE "s +
+            " --queue-num "s + dir);*/
+    /*cmd += ("\nsudo iptables -t filter "s +
+            (!isDeleting ? "-I "s : "-D "s) +
+            (conf->direction == 0 ? "INPUT "s : "POSTROUTING "s) +
+            "-p "s + protocol + " -j NFQUEUE "s
+            /*" --queue-num "s + dir);*/
+    cout << "IPTABLE RULE: " << endl
+         << "\t#" << cmd << endl;
+    system(("\n#/bin/bash\n\n"s + cmd).c_str());
 };
