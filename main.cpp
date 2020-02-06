@@ -223,7 +223,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     // pcpp::EthLayer *newEthernetLayer = new pcpp::EthLayer(pcpp::MacAddress("f0:4b:3a:4f:80:30"), pcpp::MacAddress("a2:ee:e9:dd:4c:14"));
     // inPacket->insertLayer(nullptr, newEthernetLayer, true);
     inPacket->computeCalculateFields();
-    pcpp::IPv4Address ip("165.22.66.6");
+    //pcpp::IPv4Address ip("165.22.66.6");
 
     conf->received.bytes += inPacketRaw->getRawDataLen();
     conf->received.packets++;
@@ -231,6 +231,22 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     //DOC: scrorro i pacchetti per inspezione
     DEBUG("[#" << conf->received.packets << "] -> " << inPacket->getLastLayer()->toString() << endl);
     printAllLayers(inPacket);
+
+    //modifico
+    inPacket->getLayerOfType<pcpp::IPv4Layer>()->setDstIpAddress(IPv4Address("1.1.1.1"));
+    inPacket->computeCalculateFields();
+    //ricreo
+    pcpp::RawPacket *inPacketRaw2 = new pcpp::RawPacket(inPacket->getRawPacket()->getRawData(),
+                                                        inPacket->getRawPacket()->getRawDataLen(),
+                                                        timestamp, false, pcpp::LINKTYPE_RAW);
+    pcpp::Packet *inPacket2 = new pcpp::Packet(inPacketRaw2);
+    //verifico
+    cout << "verifico" << endl;
+    printAllLayers(inPacket2);
+
+    return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT,
+                           inPacket->getRawPacket()->getRawDataLen(),
+                           inPacket->getRawPacket()->getRawData());
 
     /*//DOC: accetto tutto il traffico che non è diretto al mio IP
     if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
@@ -348,25 +364,25 @@ void printAllLayers(pcpp::Packet *p) {
 }
 
 void makeIptableCmd(bool isDeleting) {
-    string proto = "";
+    string protocol = "";
     if (conf->method.compare("BEQUITE") == 0) {
-        proto = "icmp"; //TODO: cambiare
+        protocol = "icmp"; //TODO: cambiare
     } else if (conf->method.compare("DNSROBBER") == 0) {
-        proto = "udp port 53";
+        protocol = "udp port 53";
     } else if (conf->method.compare("ICMP") == 0) {
-        proto = "icmp";
+        protocol = "icmp";
     } else if (conf->method.compare("UDPMULTIPYF") == 0) {
-        proto = "udp";
+        protocol = "udp";
     } else if (conf->method.compare("TCPMULTIPY") == 0) {
-        proto = "tcp";
+        protocol = "tcp";
     } else if (conf->method.compare("HTTP") == 0) {
-        proto = "tcp -m multiport --dports 80,443";
+        protocol = "tcp -m multiport --dports 80,443";
     }
     string cmd = ("\n#/bin/bash\n\n"s +
                   "sudo iptables -t nat "s +
                   (!isDeleting ? "-I "s : "-D "s) +
                   (conf->direction == 1 ? "PREROUTING "s : "POSTROUTING "s) +
-                  "-p "s + proto + " -j NFQUEUE "s +
+                  "-p "s + protocol + " -j NFQUEUE "s +
                   " --queue-num "s + (conf->direction == 1 ? "1"s : "2"s));
     cout << cmd << endl;
     IPTABLES(cmd.c_str());
