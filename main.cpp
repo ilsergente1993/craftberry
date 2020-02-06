@@ -100,7 +100,6 @@ void quitCraftberry() {
     nfq_close(handler);
     conf->summary();
     delete conf;
-    cout << "removing iptables rule" << endl;
     makeIptableCmd(true);
     cout << "bye bye\n";
 }
@@ -164,7 +163,6 @@ int main(int argc, char *argv[]) {
     conf->toString();
 
     //DOC: setup the queue handling
-    cout << "adding iptables rule" << endl;
     makeIptableCmd(false);
 
     handler = nfq_open();
@@ -192,7 +190,7 @@ int main(int argc, char *argv[]) {
         t.detach();
         cout << "Working in timeout mode: " << timeout << " seconds left." << endl;
     } else {
-        cout << "Working in infinite mode, press ctrl+c to exit..." << endl;
+        cout << "Working in infinity mode, press ctrl+c to exit..." << endl;
     }
     while (true) {
         //DOC: I quit only when ctrl+c is pressed
@@ -212,7 +210,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     CHECK(ph == nullptr, "Issue while packet header");
     unsigned char *rawData = nullptr;
     int len = nfq_get_payload(nfa, &rawData);
-    CHECK(len < 0, "Can\'t get payload data");
+    CHECK(len < 0, "Can't get payload data");
 
     struct timeval timestamp;
     nfq_get_timestamp(nfa, &timestamp);
@@ -233,22 +231,14 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     printAllLayers(inPacket);
 
     //modifico
-    inPacket->getLayerOfType<pcpp::IPv4Layer>()->setDstIpAddress(IPv4Address("1.1.1.1"));
-    inPacket->computeCalculateFields();
-    //ricreo
-    pcpp::RawPacket *inPacketRaw2 = new pcpp::RawPacket(inPacket->getRawPacket()->getRawData(),
-                                                        inPacket->getRawPacket()->getRawDataLen(),
-                                                        timestamp, false, pcpp::LINKTYPE_RAW);
-    pcpp::Packet *inPacket2 = new pcpp::Packet(inPacketRaw2);
-    //verifico
-    cout << "verifico" << endl;
-    printAllLayers(inPacket2);
+    //inPacket->getLayerOfType<pcpp::IPv4Layer>()->setDstIpAddress(IPv4Address("10.135.63.160"));
+    //inPacket->computeCalculateFields();
 
-    return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT,
-                           inPacket->getRawPacket()->getRawDataLen(),
-                           inPacket->getRawPacket()->getRawData());
+    //    inPacket->getRawPacket()->getRawDataLen(),
+    //    inPacket->getRawPacket()->getRawData());
 
     /*//DOC: accetto tutto il traffico che non è diretto al mio IP
+    pcpp::IPv4Address ip("165.22.66.6");
     if (!inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().equals(&ip)) {
         return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
     }*/
@@ -358,7 +348,7 @@ void help() {
 void printAllLayers(pcpp::Packet *p) {
     pcpp::Layer *L = p->getFirstLayer();
     while (L != nullptr) {
-        cout << "\t\tLEV: " << L->getOsiModelLayer() << " => " << L->toString() << endl;
+        cout << "\t\t| LEV: " << L->getOsiModelLayer() << " => " << L->toString() << endl;
         L = L->getNextLayer();
     }
 }
@@ -378,12 +368,11 @@ void makeIptableCmd(bool isDeleting) {
     } else if (conf->method.compare("HTTP") == 0) {
         protocol = "tcp -m multiport --dports 80,443";
     }
-    string cmd = ("\n#/bin/bash\n\n"s +
-                  "sudo iptables -t nat "s +
+    string cmd = ("sudo iptables -t nat "s +
                   (!isDeleting ? "-I "s : "-D "s) +
-                  (conf->direction == 1 ? "PREROUTING "s : "POSTROUTING "s) +
+                  (conf->direction == 1 ? "INPUT "s : "POSTROUTING "s) +
                   "-p "s + protocol + " -j NFQUEUE "s +
                   " --queue-num "s + (conf->direction == 1 ? "1"s : "2"s));
-    cout << cmd << endl;
-    IPTABLES(cmd.c_str());
+    cout << "IPTABLE RULE: " << cmd << endl;
+    IPTABLES(("\n#/bin/bash\n\n"s + cmd).c_str());
 };
