@@ -72,8 +72,9 @@ void ctrl_c(int);
 void help();
 void listInterfaces();
 void printAllLayers(pcpp::Packet *p);
-bool sendPkt(RawPacket *p, PcapLiveDevice *destination);
-void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination);
+bool sendPkt(const uint8_t *packetData, int packetDataLength);
+bool sendPkt(RawPacket *p);
+void sendPkt(vector<RawPacket *> *pToSend);
 void quitCraftberry();
 void makeIptableCmd(bool);
 int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
@@ -250,7 +251,29 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("ICMP") == 0) {
+    if (conf->method.compare("ICMP") == 0 && IcmpMultiply::isIcmp(inPacket)) {
+        return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
+    }
+
+    if (conf->method.compare("ICMPMULTIPLY") == 0 && IcmpMultiply::isIcmp(inPacket)) {
+        // pcpp::Packet *outPacket = new pcpp::Packet(*inPacket);
+        // cout << "\tOUT: " << outPacket->getLastLayer()->toString() << endl;
+        inPacket->removeLastLayer();
+        IcmpLayer *pingreq = new IcmpLayer();
+        //modifico l'id ed il numero di sequenza della richiesta
+        pingreq->setInfoRequestData(3, 47);
+        // inPacket->getRawPacket()->getPacketTimeStamp().tv_sec,
+        // pingreq->getEchoRequestData()->data,
+        // pingreq->getEchoRequestData()->dataLength);
+        inPacket->addLayer(pingreq);
+        cout << "---"<< endl;
+        printAllLayers(inPacket);
+
+        //cout << " -- pacchetto copiato" << endl;
+        //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+        //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+        //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
@@ -266,7 +289,7 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         outPacketRaw->setRawData(inPacket->getRawPacket()->getRawData(), inPacket->getRawPacket()->getRawDataLen(), timestamp);
         pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
 
-        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
+        CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
         //return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_DROP, 0, NULL);
         return verdict_accept(qh, ntohl(ph->packet_id), outPacket);
     }
@@ -279,12 +302,13 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         pcpp::Packet *outPacket = new pcpp::Packet(outPacketRaw);
 
         cout << "OUT: " << outPacket->getLastLayer()->toString() << endl;
-        printAllLayers(outPacket);
+        if (verbose)
+            printAllLayers(outPacket);
 
         //cout << " -- pacchetto copiato" << endl;
-        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
-        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
-        CHECK(!sendPkt(outPacket->getRawPacket(), conf->devTun0), "packet not sent");
+        CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+        CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+        CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
 
         DEBUG(" -- pacchetto inviato a (" << conf->devTun0->getName() << ") " << conf->devTun0->getIPv4Address().toString() << endl);
     }
@@ -293,13 +317,29 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
 }
 
-bool sendPkt(RawPacket *p, PcapLiveDevice *destination) {
-    if (p->getRawDataLen() > destination->getMtu()) {
+bool sendPkt(const uint8_t *packetData, int packetDataLength) {
+    if (packetDataLength > conf->devTun0->getMtu()) {
+        conf->dropped.packets++;
+        conf->dropped.bytes += packetDataLength;
+        return false;
+    }
+    if (conf->devTun0->sendPacket(packetData, packetDataLength)) {
+        conf->created.packets++;
+        conf->created.bytes += packetDataLength;
+        //conf->devLogFile->writePacket(*p); //TODO:
+        return true;
+    }
+    cout << "something strange did just happen" << endl;
+    return false;
+};
+
+bool sendPkt(RawPacket *p) {
+    if (p->getRawDataLen() > conf->devTun0->getMtu()) {
         conf->dropped.packets++;
         conf->dropped.bytes += p->getRawDataLen();
         return false;
     }
-    if (destination->sendPacket(*p)) {
+    if (conf->devTun0->sendPacket(*p)) {
         conf->created.packets++;
         conf->created.bytes += p->getRawDataLen();
         conf->devLogFile->writePacket(*p);
@@ -309,18 +349,18 @@ bool sendPkt(RawPacket *p, PcapLiveDevice *destination) {
     return false;
 };
 
-void sendPkt(vector<RawPacket *> *pToSend, PcapLiveDevice *destination) {
+void sendPkt(vector<RawPacket *> *pToSend) {
     int cont = 0;
     double size = 0;
     for (auto p : *pToSend) {
-        if (!sendPkt(p, destination)) {
+        if (!sendPkt(p)) {
             cout << "1 packet skipped" << endl;
         } else {
             cont++;
             size += p->getRawDataLen();
         }
     }
-    DEBUG(" └> " << cont << " packets (" << size << " B) to " << destination->getIPv4Address().toString() << endl);
+    DEBUG(" └> " << cont << " packets (" << size << " B) to " << conf->devTun0->getIPv4Address().toString() << endl);
 };
 
 void help() {
@@ -375,11 +415,11 @@ void makeIptableCmd(bool isDeleting) {
         protocol = "all";
     } else if (conf->method.compare("DNSROBBER") == 0) {
         protocol = "udp port 53";
-    } else if (conf->method.compare("ICMP") == 0) {
+    } else if (conf->method.compare("ICMP") == 0 || conf->method.compare("ICMPMULTIPLY") == 0) {
         protocol = "icmp";
-    } else if (conf->method.compare("UDPMULTIPYF") == 0) {
+    } else if (conf->method.compare("UDPMULTIPLY") == 0) {
         protocol = "udp";
-    } else if (conf->method.compare("TCPMULTIPY") == 0) {
+    } else if (conf->method.compare("TCPMULTIPLY") == 0) {
         protocol = "tcp";
     } else if (conf->method.compare("HTTP") == 0) {
         protocol = "tcp -m multiport --dports 80,443";

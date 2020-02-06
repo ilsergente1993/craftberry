@@ -19,7 +19,7 @@ using namespace pcpp;
 
 class IcmpMultiply : public Action {
 
-  public:
+public:
     static const int level = 4; //TODO: ??
     int nIn, nOut;
 
@@ -40,5 +40,8 @@ class IcmpMultiply : public Action {
     void craftInGoing(Packet *inPacket) {
     }
     void craftOutGoing(Packet *inPacket) {
+    }
+    static bool isIcmp(Packet *p) {
+        return p->getLayerOfType<IcmpLayer>() != nullptr;
     }
 };
