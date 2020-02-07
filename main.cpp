@@ -70,7 +70,6 @@ int verdict_drop(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
 int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p);
 static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 
-
 //DOC: handler function to manage external signals
 void ctrl_c(int s) {
     if (conf == nullptr)
@@ -242,6 +241,12 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         Action::HTTP *c = new Action::HTTP();
         c->changeUrl(inPacket);
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
+    }
+    if (conf->method.compare("HTTPBLOCK") == 0 && Action::HTTP::isProto(inPacket)) {
+        cout << "packet blocked" << endl;
+        if (!verbose)
+            printAllLayers(inPacket);
+        return verdict_drop(qh, ntohl(ph->packet_id), inPacket);
     }
 
     if (conf->method.compare("ICMPMULTIPLY") == 0 && Action::Icmp::isProto(inPacket)) {

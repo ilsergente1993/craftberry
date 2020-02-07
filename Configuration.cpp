@@ -252,7 +252,7 @@ void makeIptableCmd(bool isDeleting) {
         protocol = "udp";
     } else if (conf->method.compare("TCPMULTIPLY") == 0 || conf->method.compare("IPV4") == 0) {
         protocol = "tcp";
-    } else if (conf->method.compare("HTTP") == 0) {
+    } else if (conf->method.compare("HTTP") == 0 || conf->method.compare("HTTPBLOCK") == 0) {
         protocol = "tcp -m multiport --dports 80,443";
     }
     string dir = std::to_string(static_cast<std::underlying_type<Direction>::type>(conf->direction));
