@@ -44,7 +44,7 @@ public:
         return;
     };
 
-    static bool isProto(Packet *p) {
+    static bool isProtocol(Packet *p) {
         return p->getLastLayer()->getProtocol() == pcpp::DNS;
     }
 };

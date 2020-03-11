@@ -151,10 +151,10 @@ public:
 void help() {
     cout << "\nUsage: Craftberry options:\n"
             "-------------------------\n"
-            "craftberry -I tun0_interface -a [ ATTACK | DEFENSE ]\n"
+            "craftberry -a [ ATTACK | DEFENSE ] -i tun0_interface\n"
             "Options:\n"
-            "    -I            : Use the specified interface. Can be interface name (e.g eth0) or interface IPv4 address\n"
             "    -a            : Use the specified action\n"
+            "    -i            : Use the specified interface, tun0 by default. Can be interface name (e.g eth0) or interface IPv4 address\n"
             "    -t            : Use the specified timeout in seconds, if not defined it runs until some external signal stops the execution (e.g. ctrl+c)\n"
             "    -l            : Write all the crafted and generated traffic into a pcapng file having name passed by parameter or, if the parameter\'s equal to \'default\', the name is `out_<epoch_ms>.pcapng`\n"
             "    -d            : Direction filtering by and perform the crafting {IN, OUT}, default = IN\n"
@@ -171,7 +171,6 @@ void help() {
             "       ICMPMULTIPY: multiply N times every icmp packet to dst (IN, OUT)\n"
             "   - DEFENSE:\n"
             "       CHACHA20   : encrypt all the outgoing traffic (OUT) or decrypt all the ingoing traffic (IN)\n";
-    exit(0);
 }
 
 bool sendPkt(const uint8_t *packetData, int packetDataLength) {
@@ -237,6 +236,7 @@ int verdict_accept(struct nfq_q_handle *qh, u_int32_t id, Packet *p) {
     conf->crafted.packets++;
     conf->crafted.bytes += p->getRawPacket()->getRawDataLen();
     p->computeCalculateFields();
+    conf->devLogFile->writePacket(*p->getRawPacket(), "packet crafted by craftberry");
     return nfq_set_verdict(qh, id, NF_ACCEPT, p->getRawPacket()->getRawDataLen(), p->getRawPacket()->getRawData());
 }
 
@@ -246,14 +246,14 @@ void makeIptableCmd(bool isDeleting) {
         protocol = "all";
     } else if (conf->method.compare("DNSROBBER") == 0) {
         protocol = "udp port 53";
-    } else if (conf->method.compare("ICMP") == 0 || conf->method.compare("ICMPMULTIPLY") == 0 || conf->method.compare("IPV4") == 0) {
+    } else if (conf->method.compare("ICMP") == 0 || conf->method.compare("ICMPMULTIPLY") == 0) {
         protocol = "icmp";
     } else if (conf->method.compare("UDPMULTIPLY") == 0) {
         protocol = "udp";
     } else if (conf->method.compare("TCPMULTIPLY") == 0 || conf->method.compare("IPV4") == 0) {
         protocol = "tcp";
     } else if (conf->method.compare("HTTP") == 0 || conf->method.compare("HTTPBLOCK") == 0) {
-        protocol = "tcp -m multiport --dports 80,443";
+        protocol = "tcp -m multiport " + (conf->direction == PacketDirection::InGoing ? "--sports 80,443"s : "--dports 80,443"s);
     }
     string dir = std::to_string(static_cast<std::underlying_type<Direction>::type>(conf->direction));
     string cmd = ("sudo iptables -t filter "s +

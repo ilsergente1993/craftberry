@@ -33,7 +33,7 @@ public:
         cout << " a " << inPacket->getLayerOfType<pcpp::IPv4Layer>()->getDstIpAddress().toString() << endl;
     }
 
-    static bool isProto(Packet *p) {
+    static bool isProtocol(Packet *p) {
         return p->getLastLayer()->getProtocol() == pcpp::IPv4;
     }
 };

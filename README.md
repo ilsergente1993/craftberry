@@ -5,11 +5,11 @@
 ### How to use
 
 ```bash
-craftberry -I tun0_interface -a [ ATTACK | DEFENSE ]
+craftberry -a [ ATTACK | DEFENSE ] -i tun0_interface
 
 Options:
-    -I            : Use the specified interface. Can be interface name (e.g eth0) or interface IPv4 address
     -a            : Use the specified action
+    -i            : Use the specified interface, tun0 by default. Can be interface name (e.g eth0) or interface IPv4 address
     -t            : Use the specified timeout in seconds, if not defined it runs until some external signals stop the execution (e.g. ctrl+c)
     -l            : Write all the crafted and generated traffic into a pcapng file having name passed by parameter or, if the parameter\'s equal to \'default\', the name is `out_<epoch_ms>.pcapng`
     -d            : Direction filtering by and perform the crafting {IN, OUT}, default = IN
@@ -37,6 +37,11 @@ The application requires the pcapplusplus libs and libnetfilter-queue-dev instal
 You can find the installation procedure [here](https://pcapplusplus.github.io/docs/install) and [here](https://www.howtoinstall.co/it/ubuntu/trusty/libnetfilter-queue-dev)
 
 Use ```make``` to compile and produce the executable file.
+
+### check iptables rules
+```bash
+(sudo iptables -L INPUT; sudo iptables -L OUTPUT) | cat
+```
 
 ### How to send fake traffic for testing
 

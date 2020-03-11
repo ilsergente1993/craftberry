@@ -16,6 +16,7 @@
 using namespace std;
 using namespace pcpp;
 
+
 namespace Action {
 class HTTP {
 
@@ -26,12 +27,17 @@ public:
     HTTP() : n(0){};
     ~HTTP(){};
 
-    void changeUrl(Packet *inPacket) {
+    void changeUrl(Packet *inPacket, bool dir) {
         cout << "url:     " << inPacket->getLayerOfType<HttpRequestLayer>()->getUrl() << endl;
         HttpRequestLayer *http = inPacket->getLayerOfType<HttpRequestLayer>();
         //http->getFirstLine()->setMethod(pcpp::HttpRequestLayer::HttpGET);
         http->getFieldByName(PCPP_HTTP_HOST_FIELD)->setFieldValue("www.jafed.xyz");
-        http->getFirstLine()->setUri("/test.txt");
+
+        if (dir == 1)
+            http->getFirstLine()->setUri("/test.txt");
+        else
+            http->getFirstLine()->setUri("/");
+
         http->computeCalculateFields();
         inPacket->computeCalculateFields();
         cout << "new url: " << inPacket->getLayerOfType<HttpRequestLayer>()->getUrl() << endl;
@@ -65,7 +71,7 @@ public:
     //     return pp;
     // }
 
-    static bool isProto(Packet *p) {
+    static bool isProtocol(Packet *p) {
         return p->getLastLayer()->getProtocol() == pcpp::HTTPRequest;
     }
 };

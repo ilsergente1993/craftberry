@@ -1,0 +1,20 @@
+[0;1;32m●[0m mysterium-node.service - Server for Mysterium - decentralised VPN Network
+   Loaded: loaded (/lib/systemd/system/mysterium-node.service; enabled; vendor preset: enabled)
+   Active: [0;1;32mactive (running)[0m since Sat 2020-03-07 21:15:08 UTC; 10s ago
+     Docs: https://mysterium.network/
+ Main PID: 16394 (myst)
+    Tasks: 11 (limit: 1151)
+   CGroup: /system.slice/mysterium-node.service
+           ├─16394 /usr/bin/myst --config-dir=/etc/mysterium-node --data-dir=/var/lib/mysterium-node --runtime-dir=/var/run/mysterium-node --tequilapi.address=127.0.0.1 service --agreed-terms-and-conditions openvpn,wireguard
+           └─16502 openvpn --port 49549 --server 10.8.0.0 255.255.255.0 --topology subnet --tls-server --dh none --explicit-exit-notify --ca /var/run/mysterium-node/ca.crt --cert /var/run/mysterium-node/server.crt --key /var/run/mysterium-node/server.key --tls-crypt /var/run/mysterium-node/ta.key --cipher AES-256-GCM --verb 3 --tls-version-min 1.2 --management-client-pf --management-client-auth --verify-client-cert none --tls-cipher TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384 --reneg-sec 3600 --keepalive 10 60 --ping-timer-rem --persist-key --auth none --local 0.0.0.0 --iproute /etc/mysterium-node/nonpriv-ip --persist-tun --dev tun0 --management 127.0.0.1 35011 --management-client
+
+Mar 07 21:15:13 devnode sudo[16551]: [0;1;39m[0;1;31m[0;1;39mmysterium-node : TTY=unknown ; PWD=/ ; USER=root ; COMMAND=/sbin/tc qdisc del dev ifb0 root[0m
+Mar 07 21:15:13 devnode sudo[16551]: pam_unix(sudo:session): session opened for user root by (uid=0)
+Mar 07 21:15:13 devnode myst[16394]: 2020-03-07T21:15:13.888 ??? vendor/github.com/rs/zerolog/log.go:403  > Cannot find device "ifb0"
+Mar 07 21:15:13 devnode sudo[16551]: pam_unix(sudo:session): session closed for user root
+Mar 07 21:15:13 devnode sudo[16555]: [0;1;39m[0;1;31m[0;1;39mmysterium-node : TTY=unknown ; PWD=/ ; USER=root ; COMMAND=/sbin/tc qdisc del dev ifb0 ingress[0m
+Mar 07 21:15:13 devnode sudo[16555]: pam_unix(sudo:session): session opened for user root by (uid=0)
+Mar 07 21:15:13 devnode myst[16394]: 2020-03-07T21:15:13.895 ??? vendor/github.com/rs/zerolog/log.go:403  > Cannot find device "ifb0"
+Mar 07 21:15:13 devnode sudo[16555]: pam_unix(sudo:session): session closed for user root
+Mar 07 21:15:13 devnode myst[16394]: 2020-03-07T21:15:13.896 DBG config/config.go:181                     > Returning user config value shaper.enabled:false
+Mar 07 21:15:13 devnode myst[16394]: 2020-03-07T21:15:13.897 INF services/openvpn/service/manager.go:213  > OpenVPN server waiting

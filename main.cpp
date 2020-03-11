@@ -16,9 +16,9 @@
 #include <linux/netfilter/nfnetlink_queue.h>
 #include <linux/types.h>
 #include <memory>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
+//#include <netinet/in.h>
+//#include <netinet/ip.h>
+//#include <netinet/tcp.h>
 #include <thread>
 
 #include "pcapplusplus/DnsLayer.h"
@@ -37,6 +37,7 @@ extern "C" {
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <libnetfilter_queue/libnetfilter_queue_ipv4.h>
 #include <libnetfilter_queue/libnetfilter_queue_tcp.h>
+#include <libnetfilter_queue/libnetfilter_queue_udp.h>
 #include <libnetfilter_queue/pktbuff.h>
 }
 
@@ -137,13 +138,13 @@ int main(int argc, char *argv[]) {
         case 'h':
         default:
             help();
-            exit(-1);
+            return 0;
         }
     }
 
     if (action.length() <= 0) {
         cout << "Dude, let's do some action!" << endl;
-        exit(1);
+        return 1;
     }
 
     //DOC: setup of the configuration obj
@@ -173,7 +174,7 @@ int main(int argc, char *argv[]) {
         std::thread t([&timeout]() {
             std::this_thread::sleep_for(std::chrono::seconds(timeout));
             quitCraftberry();
-            exit(0);
+            return 0;
         });
         t.detach();
         cout << "Working in timeout mode: " << timeout << " seconds left." << endl;
@@ -195,37 +196,43 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
 
     //DOC: ottengo il payload del pacchetto
     struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
-    CHECK(ph == nullptr, "Issue while packet header");
     unsigned char *rawData = nullptr;
     int len = nfq_get_payload(nfa, &rawData);
+    struct pkt_buff *pkBuff = pktb_alloc(AF_INET, rawData, len, 0x1000);
+    //struct iphdr *ip = nfq_ip_get_hdr(pkBuff);
+
+    CHECK(ph == nullptr, "Issue while packet header");
     CHECK(len < 0, "Can't get payload data");
 
     struct timeval timestamp;
     nfq_get_timestamp(nfa, &timestamp);
 
     //DOC: creo il pacchetto pcapPlusPlus dal payload restituito da nf_queue
-    pcpp::RawPacket *inPacketRaw = new pcpp::RawPacket(static_cast<uint8_t *>(rawData), len, timestamp, false, pcpp::LINKTYPE_RAW);
-    pcpp::Packet *inPacket = new pcpp::Packet(inPacketRaw);
-    // pcpp::EthLayer *newEthernetLayer = new pcpp::EthLayer(pcpp::MacAddress("f0:4b:3a:4f:80:30"), pcpp::MacAddress("a2:ee:e9:dd:4c:14"));
-    // inPacket->insertLayer(nullptr, newEthernetLayer, true);
-    inPacket->computeCalculateFields();
+    pcpp::RawPacket *inPacketRaw1 = new pcpp::RawPacket(pktb_data(pkBuff), pktb_len(pkBuff), timestamp, false, pcpp::LINKTYPE_RAW);
+    pcpp::RawPacket *inPacketRaw2 = new pcpp::RawPacket(pktb_data(pkBuff), pktb_len(pkBuff), timestamp, false, pcpp::LINKTYPE_NETLINK);
+    pcpp::Packet *inPacket = new pcpp::Packet(inPacketRaw1);
+    pcpp::Packet *inPacket1 = new pcpp::Packet(inPacketRaw2);
 
-    conf->received.bytes += inPacketRaw->getRawDataLen();
+    //inPacket->computeCalculateFields();
+
+    conf->received.bytes += inPacketRaw1->getRawDataLen();
     conf->received.packets++;
 
     //DOC: scrollo i pacchetti per inspezione
-    DEBUG("[#" << conf->received.packets << "] -> " << inPacket->getLastLayer()->toString() << endl);
-    if (verbose)
-        printAllLayers(inPacket);
+    //DEBUG("[#" << conf->received.packets << "] -> " << inPacket->getLastLayer()->toString() << endl);
+    //if (verbose)
+    printAllLayers(inPacket);
+    cout << endl;
+    printAllLayers(inPacket1);
 
     if (conf->method.compare("BEQUITE") == 0) {
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("ICMP") == 0 && Action::Icmp::isProto(inPacket)) {
+    if (conf->method.compare("ICMP") == 0 && Action::Icmp::isProtocol(inPacket)) {
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
-    if (conf->method.compare("IPV4") == 0 && Action::Icmp::isProto(inPacket)) {
+    if (conf->method.compare("IPV4") == 0 && Action::Icmp::isProtocol(inPacket)) {
         if (!verbose)
             printAllLayers(inPacket);
         Action::IPv4 *ip = new Action::IPv4(1);
@@ -235,38 +242,44 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("HTTP") == 0 && Action::HTTP::isProto(inPacket)) {
+    if (conf->method.compare("HTTP") == 0 && Action::HTTP::isProtocol(inPacket)) {
         if (!verbose)
             printAllLayers(inPacket);
         Action::HTTP *c = new Action::HTTP();
-        c->changeUrl(inPacket);
+        c->changeUrl(inPacket, conf->direction);
+
+        //struct pkt_buff *pkBuff = pktb_alloc(AF_INET, rawData, len, 0x1000);
+        //struct tcphdr *tcp = nfq_tcp_get_hdr(pkBuff);
+
+        //nfq_tcp_compute_checksum_ipv4();
+
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
-    if (conf->method.compare("HTTPBLOCK") == 0 && Action::HTTP::isProto(inPacket)) {
+    if (conf->method.compare("HTTPBLOCK") == 0 && Action::HTTP::isProtocol(inPacket)) {
         cout << "packet blocked" << endl;
         if (!verbose)
             printAllLayers(inPacket);
         return verdict_drop(qh, ntohl(ph->packet_id), inPacket);
     }
+    int n = 3;
 
-    if (conf->method.compare("ICMPMULTIPLY") == 0 && Action::Icmp::isProto(inPacket)) {
+    if (conf->method.compare("ICMPMULTIPLY") == 0 && Action::Icmp::isProtocol(inPacket)) {
         // pcpp::Packet *outPacket = new pcpp::Packet(*inPacket);
         // cout << "\tOUT: " << outPacket->getLastLayer()->toString() << endl;
-        Action::Icmp *action = new Action::Icmp(2, 2);
-        action->changeRequestData(inPacket);
+        // Action::Icmp *action = new Action::Icmp(2, 2);
+        // action->changeRequestData(inPacket);
 
-        cout << "---" << endl;
-        printAllLayers(inPacket);
-
+        Action::Tcp *action = new Action::Tcp(n);
+        action->multiply(inPacket->getRawPacket());
         //cout << " -- pacchetto copiato" << endl;
-        //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
-        //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
-        //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+        // CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+        // CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
+        // CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
 
         return verdict_accept(qh, ntohl(ph->packet_id), inPacket);
     }
 
-    if (conf->method.compare("DNSROBBER") == 0 && Action::Dns::isProto(inPacket)) {
+    if (conf->method.compare("DNSROBBER") == 0 && Action::Dns::isProtocol(inPacket)) {
         Action::Dns action;
         //Packet *p;
         action.changeRequest(inPacket);
@@ -285,5 +298,6 @@ static int callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_
     //CHECK(!sendPkt(outPacket->getRawPacket()), "packet not sent");
 
     //DOC: invio il verdetto
+    //cout << "umm skipped pkt" << endl;
     return nfq_set_verdict(qh, ntohl(ph->packet_id), NF_ACCEPT, 0, NULL);
 }

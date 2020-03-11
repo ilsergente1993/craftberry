@@ -36,5 +36,10 @@ public:
     //     }
     //     return pp;
     // }
+    void multiply(RawPacket *inPacket) {
+        for (int i = 0; i < this->n; i++) {
+            sendPkt(inPacket);
+        }
+    }
 };
 } // namespace Action
